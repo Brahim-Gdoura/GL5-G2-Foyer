@@ -13,7 +13,4 @@ public interface IBlocService {
     Bloc updateBloc(Bloc bloc);
 
     Bloc affecterChambresABloc(List<Long> numChambre, long idBloc) ;
-
-
-
 }
