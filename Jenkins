@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven 3.9.9'   // exact Maven name from Jenkins
-        jdk 'jdk17'            // exact JDK name from Jenkins
+        maven 'Maven 3.9.9'
+        jdk 'jdk17'
     }
 
     environment {
@@ -22,7 +22,7 @@ pipeline {
         stage('Build & Test') {
             steps {
                 echo '🔹 Building and running tests...'
-                bat 'mvn clean verify'
+                sh 'mvn clean verify'
             }
         }
 
