@@ -2,9 +2,8 @@ pipeline {
     agent any
 
     tools {
-        // Make sure these tools are configured in Jenkins (Manage Jenkins > Global Tool Configuration)
-        maven 'Maven3'        // Replace with your Maven installation name
-        jdk 'JDK17'           // Replace with your JDK installation name
+        maven 'Maven 3.9.9'   // exact Maven name from Jenkins
+        jdk 'jdk17'            // exact JDK name from Jenkins
     }
 
     environment {
@@ -15,8 +14,8 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                echo '🔹 Checking out source code...'
-                checkout scm
+                echo '🔹 Checking out feature/ReadMeInit branch...'
+                git branch: 'feature/ReadMeInit', url: 'https://github.com/Brahim-Gdoura/GL5-G2-Foyer.git'
             }
         }
 
