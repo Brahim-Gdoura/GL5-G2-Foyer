@@ -1,87 +1,78 @@
 pipeline {
     agent any
-
+    
     environment {
-        terraformDir = 'terraform'
-        awsCredentialsId = 'aws-credentials'
-        kubeConfigCredentialId = 'kubeconfig-credentials'
+        AWS_REGION = 'us-east-1'
+        TF_VAR_project_name = 'k3s-jenkins'
     }
-
+    
     stages {
-
-        stage('Test AWS Credentials') {
+        stage('Checkout') {
             steps {
-                withCredentials([file(credentialsId: awsCredentialsId, variable: 'AWS_CREDENTIALS_FILE')]) {
-                    script {
-                        // Read AWS credentials file
-                        def awsCredentials = readFile(AWS_CREDENTIALS_FILE).trim().split("\n")
-
-                        // Extract keys and token
-                        env.AWS_ACCESS_KEY_ID = awsCredentials.find { it.startsWith("aws_access_key_id") }.split("=")[1].trim()
-                        env.AWS_SECRET_ACCESS_KEY = awsCredentials.find { it.startsWith("aws_secret_access_key") }.split("=")[1].trim()
-                        env.AWS_SESSION_TOKEN = awsCredentials.find { it.startsWith("aws_session_token") }?.split("=")[1]?.trim()
-
-                        // Optional: Linux paths for AWS config
-                        env.AWS_CONFIG_FILE = "${HOME}/.aws/config"
-                        env.AWS_SHARED_CREDENTIALS_FILE = AWS_CREDENTIALS_FILE
-
-                        echo "AWS Access Key ID: ${env.AWS_ACCESS_KEY_ID}"
-                        echo "AWS Credentials File Loaded"
-                    }
-                }
+                git branch: 'main', 
+                    url: 'https://github.com/votre-username/votre-repo-terraform.git'
             }
         }
-
-        stage('SETUP TERRAFORM') {
+        
+        stage('Terraform Init') {
             steps {
-                echo "Before entering Terraform directory"
-                dir(terraformDir) {
-                    echo "In Terraform directory"
-                    script {
-                        echo "AWS Access Key ID: ${env.AWS_ACCESS_KEY_ID}"
-                        sh 'terraform init'
-                        sh 'terraform validate'
-                        sh 'terraform apply -auto-approve'
-                    }
-                }
+                sh 'terraform init'
             }
         }
-
-        stage('UPDATE KUBECONFIG') {
+        
+        stage('Terraform Validate') {
+            steps {
+                sh 'terraform validate'
+            }
+        }
+        
+        stage('Terraform Plan') {
+            steps {
+                sh 'terraform plan -out=tfplan'
+            }
+        }
+        
+        stage('Terraform Apply') {
+            steps {
+                sh 'terraform apply -auto-approve tfplan'
+            }
+        }
+        
+        stage('Test Deployment') {
             steps {
                 script {
-                    withCredentials([file(credentialsId: awsCredentialsId, variable: 'AWS_CREDENTIALS_FILE')]) {
-                        sh 'aws eks update-kubeconfig --name mykubernetes --region us-east-1'
-                    }
+                    def ip = sh(
+                        script: 'terraform output -raw k3s_server_public_ip',
+                        returnStdout: true
+                    ).trim()
+                    
+                    echo "K3s Server IP: ${ip}"
+                    
+                    // Test basique de connexion SSH
+                    sh "ssh -o StrictHostKeyChecking=no ubuntu@${ip} 'sudo kubectl get nodes'"
                 }
             }
         }
-
-        stage('DEPLOY TO AWS KUBERNETES') {
-            steps {
-                script {
-                    withCredentials([file(credentialsId: awsCredentialsId, variable: 'AWS_CREDENTIALS_FILE')]) {
-                        env.KUBECONFIG = "${HOME}/.kube/config"
-                        sh 'aws sts get-caller-identity'
-                        echo "Kubeconfig content: ${readFile(env.KUBECONFIG).trim()}"
-                        sh "kubectl apply -f k8s/deployment.yaml"
-                        sh "kubectl apply -f k8s/service.yaml"
-                    }
-                }
+    }
+    
+    post {
+        always {
+            echo 'Pipeline execution completed'
+            // Nettoyage optionnel
+            // sh 'terraform destroy -auto-approve'
+        }
+        success {
+            echo '✅ K3s cluster deployed successfully!'
+            script {
+                def ip = sh(
+                    script: 'terraform output -raw k3s_server_public_ip',
+                    returnStdout: true
+                ).trim()
+                echo "🌐 K3s Dashboard: http://${ip}:30000"
             }
         }
-
-        // Optional: destroy infrastructure
-        /*
-        stage('TEARDOWN TERRAFORM') {
-            steps {
-                dir(terraformDir) {
-                    withCredentials([file(credentialsId: awsCredentialsId, variable: 'AWS_CREDENTIALS_FILE')]) {
-                        sh 'terraform destroy -auto-approve'
-                    }
-                }
-            }
+        failure {
+            echo '❌ Pipeline failed!'
         }
-        */
     }
 }
