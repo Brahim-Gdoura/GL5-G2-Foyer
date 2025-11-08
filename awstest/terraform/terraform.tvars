@@ -1,0 +1,7 @@
+# Configuration pour sandbox étudiant (FREE TIER)
+aws_region   = "us-east-1"  # Changez selon votre région préférée
+project_name = "tp-k8s"
+vpc_cidr     = "10.0.0.0/16"
+
+# Note: Les autres variables utilisent les valeurs par défaut de variables.tf
+# qui sont déjà optimisées pour le Free Tier
