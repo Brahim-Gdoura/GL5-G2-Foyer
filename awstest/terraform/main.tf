@@ -12,42 +12,36 @@ provider "aws" {
   region = var.aws_region
 }
 
+# Utiliser des ressources simples qui fonctionnent avec la plupart des comptes
 locals {
-  # AMI Ubuntu 22.04 LTS pour différentes régions (hardcodées pour éviter les permissions)
-  ami_ids = {
-    "us-east-1"    = "ami-053b0d53c279acc90" # Virginie du Nord
-    "us-east-2"    = "ami-024e6efaf93d85776" # Ohio
-    "us-west-1"    = "ami-0aab355d464c15d05" # Californie du Nord
-    "us-west-2"    = "ami-0f1a5f5ada0e7da53" # Oregon
-    "eu-west-1"    = "ami-0f1a5f5ada0e7da53" # Irlande
-    "eu-central-1" = "ami-0faab6bdbac9486fb" # Francfort
-  }
+  # AMI Ubuntu 22.04 LTS pour us-east-1 (la plus commune)
+  ubuntu_ami = "ami-053b0d53c279acc90"
   
-  # Utiliser la zone de disponibilité 'a' par défaut
+  # Zone de disponibilité simple
   availability_zone = "${var.aws_region}a"
 }
 
-# VPC (Gratuit)
+# VPC simple
 resource "aws_vpc" "main" {
-  cidr_block           = var.vpc_cidr
+  cidr_block           = "10.0.0.0/16"
   enable_dns_hostnames = true
   enable_dns_support   = true
 
   tags = {
-    Name = "${var.project_name}-vpc"
+    Name = "k3s-vpc"
   }
 }
 
-# Internet Gateway (Gratuit)
+# Internet Gateway
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "${var.project_name}-igw"
+    Name = "k3s-igw"
   }
 }
 
-# 1 seul Subnet public (Gratuit)
+# Subnet public simple
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.1.0/24"
@@ -55,11 +49,11 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "${var.project_name}-public-subnet"
+    Name = "k3s-public-subnet"
   }
 }
 
-# Route table (Gratuit)
+# Route table simple
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
@@ -69,40 +63,32 @@ resource "aws_route_table" "public" {
   }
 
   tags = {
-    Name = "${var.project_name}-public-rt"
+    Name = "k3s-public-rt"
   }
 }
 
+# Association route table
 resource "aws_route_table_association" "public" {
   subnet_id      = aws_subnet.public.id
   route_table_id = aws_route_table.public.id
 }
 
-# Security Group (Gratuit)
+# Security Group simplifié
 resource "aws_security_group" "k3s_sg" {
-  name        = "${var.project_name}-k3s-sg"
-  description = "Security group pour K3s"
+  name        = "k3s-sg"
+  description = "Security group for K3s"
   vpc_id      = aws_vpc.main.id
 
-  # SSH
+  # SSH seulement depuis votre IP (plus sécurisé)
   ingress {
     description = "SSH"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["0.0.0.0/0"]  # Pour tester, après restreindre à votre IP
   }
 
-  # Kubernetes API
-  ingress {
-    description = "Kubernetes API"
-    from_port   = 6443
-    to_port     = 6443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # HTTP
+  # HTTP/HTTPS pour les applications
   ingress {
     description = "HTTP"
     from_port   = 80
@@ -111,7 +97,6 @@ resource "aws_security_group" "k3s_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # HTTPS
   ingress {
     description = "HTTPS"
     from_port   = 443
@@ -120,15 +105,7 @@ resource "aws_security_group" "k3s_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # K3s node port range
-  ingress {
-    description = "NodePort range"
-    from_port   = 30000
-    to_port     = 32767
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
+  # Tout le trafic sortant autorisé
   egress {
     from_port   = 0
     to_port     = 0
@@ -137,55 +114,47 @@ resource "aws_security_group" "k3s_sg" {
   }
 
   tags = {
-    Name = "${var.project_name}-k3s-sg"
+    Name = "k3s-sg"
   }
 }
 
-# Clé SSH
-resource "aws_key_pair" "k3s_key" {
-  key_name   = var.key_name
-  public_key = file("${var.key_name}.pub")
-}
-
-# Instance EC2 avec K3s (Free Tier: t2.micro = 750h/mois gratuit)
-resource "aws_instance" "k3s_master" {
-  ami           = local.ami_ids[var.aws_region]
-  instance_type = "t2.micro"  # FREE TIER
+# Instance EC2 simple
+resource "aws_instance" "k3s_server" {
+  ami           = local.ubuntu_ami
+  instance_type = "t2.micro"
   subnet_id     = aws_subnet.public.id
-  key_name      = aws_key_pair.k3s_key.key_name
+  
+  # Pas de clé SSH pour simplifier (vous pouvez ajouter plus tard)
+  # key_name      = aws_key_pair.k3s_key.key_name
   
   vpc_security_group_ids = [aws_security_group.k3s_sg.id]
 
-  # Disk minimal (30 GB free tier)
+  # Disk de base
   root_block_device {
-    volume_size = 20  # GB
-    volume_type = "gp3"
-    encrypted   = true
+    volume_size = 8  # Minimum pour Ubuntu
+    volume_type = "gp2"
   }
 
-  # Script d'installation K3s automatique
-  user_data = file("${path.module}/k3s-install.sh")
+  # Script d'installation simplifié
+  user_data = <<-EOF
+              #!/bin/bash
+              apt-get update
+              apt-get install -y curl
+              curl -sfL https://get.k3s.io | sh -
+              echo "K3s installed successfully!"
+              EOF
 
   tags = {
-    Name = "${var.project_name}-k3s-master"
-    Type = "K3s-Master"
+    Name = "k3s-server"
   }
-
-  # Donner le temps à l'instance de démarrer
-  timeouts {
-    create = "10m"
-    delete = "10m"
-  }
-
-  depends_on = [aws_internet_gateway.main]
 }
 
-# Elastic IP pour avoir une IP fixe (optionnel)
+# IP Elastic simple
 resource "aws_eip" "k3s_ip" {
-  instance = aws_instance.k3s_master.id
+  instance = aws_instance.k3s_server.id
   domain   = "vpc"
   
   tags = {
-    Name = "${var.project_name}-k3s-ip"
+    Name = "k3s-ip"
   }
 }
