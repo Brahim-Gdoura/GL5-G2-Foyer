@@ -58,6 +58,8 @@ resource "aws_eks_cluster" "k8s_cluster" {
     subnet_ids = aws_subnet.eks_subnets[*].id
   }
 
-  # Only depend on the attachment if we created it
-  depends_on = aws_iam_role_policy_attachment.eks_policy
+  # depends_on must be a list
+  depends_on = [aws_iam_role_policy_attachment.eks_policy]
 }
+
+
