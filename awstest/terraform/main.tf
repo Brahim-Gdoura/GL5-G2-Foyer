@@ -12,6 +12,21 @@ provider "aws" {
   region = var.aws_region
 }
 
+locals {
+  # AMI Ubuntu 22.04 LTS pour différentes régions (hardcodées pour éviter les permissions)
+  ami_ids = {
+    "us-east-1"    = "ami-053b0d53c279acc90" # Virginie du Nord
+    "us-east-2"    = "ami-024e6efaf93d85776" # Ohio
+    "us-west-1"    = "ami-0aab355d464c15d05" # Californie du Nord
+    "us-west-2"    = "ami-0f1a5f5ada0e7da53" # Oregon
+    "eu-west-1"    = "ami-0f1a5f5ada0e7da53" # Irlande
+    "eu-central-1" = "ami-0faab6bdbac9486fb" # Francfort
+  }
+  
+  # Utiliser la zone de disponibilité 'a' par défaut
+  availability_zone = "${var.aws_region}a"
+}
+
 # VPC (Gratuit)
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
@@ -32,16 +47,11 @@ resource "aws_internet_gateway" "main" {
   }
 }
 
-# Data source pour availability zones
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
 # 1 seul Subnet public (Gratuit)
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.1.0/24"
-  availability_zone       = data.aws_availability_zones.available.names[0]
+  availability_zone       = local.availability_zone
   map_public_ip_on_launch = true
 
   tags = {
@@ -131,23 +141,7 @@ resource "aws_security_group" "k3s_sg" {
   }
 }
 
-# AMI Ubuntu (Gratuit)
-data "aws_ami" "ubuntu" {
-  most_recent = true
-  owners      = ["099720109477"] # Canonical
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-}
-
-# Clé SSH (à créer manuellement d'abord)
+# Clé SSH
 resource "aws_key_pair" "k3s_key" {
   key_name   = var.key_name
   public_key = file("${var.key_name}.pub")
@@ -155,7 +149,7 @@ resource "aws_key_pair" "k3s_key" {
 
 # Instance EC2 avec K3s (Free Tier: t2.micro = 750h/mois gratuit)
 resource "aws_instance" "k3s_master" {
-  ami           = data.aws_ami.ubuntu.id
+  ami           = local.ami_ids[var.aws_region]
   instance_type = "t2.micro"  # FREE TIER
   subnet_id     = aws_subnet.public.id
   key_name      = aws_key_pair.k3s_key.key_name
@@ -182,6 +176,8 @@ resource "aws_instance" "k3s_master" {
     create = "10m"
     delete = "10m"
   }
+
+  depends_on = [aws_internet_gateway.main]
 }
 
 # Elastic IP pour avoir une IP fixe (optionnel)
