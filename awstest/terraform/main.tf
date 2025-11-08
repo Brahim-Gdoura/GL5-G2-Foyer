@@ -1,3 +1,4 @@
+# main.tf - Version SIMPLIFIÉE
 terraform {
   required_version = ">= 1.0"
   required_providers {
@@ -18,12 +19,12 @@ locals {
 
 resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
-  tags = { Name = "k3s-vpc-${var.project_name}" }
+  tags = { Name = "k3s-vpc" }
 }
 
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
-  tags = { Name = "k3s-igw-${var.project_name}" }
+  tags = { Name = "k3s-igw" }
 }
 
 resource "aws_subnet" "public" {
@@ -31,7 +32,7 @@ resource "aws_subnet" "public" {
   cidr_block        = "10.0.1.0/24"
   availability_zone = "us-east-1a"
   map_public_ip_on_launch = true
-  tags = { Name = "k3s-public-subnet-${var.project_name}" }
+  tags = { Name = "k3s-public-subnet" }
 }
 
 resource "aws_route_table" "public" {
@@ -40,7 +41,7 @@ resource "aws_route_table" "public" {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.main.id
   }
-  tags = { Name = "k3s-public-rt-${var.project_name}" }
+  tags = { Name = "k3s-public-rt" }
 }
 
 resource "aws_route_table_association" "public" {
@@ -49,7 +50,7 @@ resource "aws_route_table_association" "public" {
 }
 
 resource "aws_security_group" "k3s_sg" {
-  name        = "k3s-sg-${var.project_name}"
+  name        = "k3s-sg"
   description = "K3s security group"
   vpc_id      = aws_vpc.main.id
 
@@ -81,7 +82,7 @@ resource "aws_security_group" "k3s_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "k3s-sg-${var.project_name}" }
+  tags = { Name = "k3s-sg" }
 }
 
 resource "aws_instance" "k3s_server" {
@@ -93,7 +94,7 @@ resource "aws_instance" "k3s_server" {
   user_data = file("${path.module}/k3s-install.sh")
 
   tags = { 
-    Name = "k3s-server-${var.project_name}"
+    Name = "k3s-server"
     Pipeline = "jenkins"
   }
 }
@@ -101,5 +102,5 @@ resource "aws_instance" "k3s_server" {
 resource "aws_eip" "k3s_ip" {
   instance = aws_instance.k3s_server.id
   domain   = "vpc"
-  tags = { Name = "k3s-ip-${var.project_name}" }
+  tags = { Name = "k3s-ip" }
 }
