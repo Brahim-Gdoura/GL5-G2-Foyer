@@ -32,6 +32,11 @@ resource "aws_internet_gateway" "main" {
   }
 }
 
+# Data source pour availability zones
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
 # 1 seul Subnet public (Gratuit)
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
@@ -105,6 +110,15 @@ resource "aws_security_group" "k3s_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # K3s node port range
+  ingress {
+    description = "NodePort range"
+    from_port   = 30000
+    to_port     = 32767
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -126,6 +140,17 @@ data "aws_ami" "ubuntu" {
     name   = "name"
     values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
   }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
+# Clé SSH (à créer manuellement d'abord)
+resource "aws_key_pair" "k3s_key" {
+  key_name   = var.key_name
+  public_key = file("${var.key_name}.pub")
 }
 
 # Instance EC2 avec K3s (Free Tier: t2.micro = 750h/mois gratuit)
@@ -133,6 +158,7 @@ resource "aws_instance" "k3s_master" {
   ami           = data.aws_ami.ubuntu.id
   instance_type = "t2.micro"  # FREE TIER
   subnet_id     = aws_subnet.public.id
+  key_name      = aws_key_pair.k3s_key.key_name
   
   vpc_security_group_ids = [aws_security_group.k3s_sg.id]
 
@@ -140,49 +166,30 @@ resource "aws_instance" "k3s_master" {
   root_block_device {
     volume_size = 20  # GB
     volume_type = "gp3"
+    encrypted   = true
   }
 
   # Script d'installation K3s automatique
-  user_data = <<-EOF
-              #!/bin/bash
-              set -e
-              
-              # Mise à jour du système
-              apt-get update
-              apt-get upgrade -y
-              
-              # Installation de K3s (Kubernetes léger)
-              curl -sfL https://get.k3s.io | sh -
-              
-              # Attendre que K3s démarre
-              sleep 30
-              
-              # Créer un namespace de démo
-              kubectl create namespace demo
-              
-              # Déployer une app de test (nginx)
-              kubectl create deployment nginx --image=nginx --namespace=demo
-              kubectl expose deployment nginx --port=80 --type=NodePort --namespace=demo
-              
-              # Copier le kubeconfig pour l'utilisateur ubuntu
-              mkdir -p /home/ubuntu/.kube
-              cp /etc/rancher/k3s/k3s.yaml /home/ubuntu/.kube/config
-              chown -R ubuntu:ubuntu /home/ubuntu/.kube
-              
-              # Afficher le token pour se connecter
-              echo "K3s installé avec succès!" > /home/ubuntu/k3s-info.txt
-              echo "Token K3s:" >> /home/ubuntu/k3s-info.txt
-              cat /var/lib/rancher/k3s/server/node-token >> /home/ubuntu/k3s-info.txt
-              
-              EOF
+  user_data = file("${path.module}/k3s-install.sh")
 
   tags = {
     Name = "${var.project_name}-k3s-master"
     Type = "K3s-Master"
   }
+
+  # Donner le temps à l'instance de démarrer
+  timeouts {
+    create = "10m"
+    delete = "10m"
+  }
 }
 
-# Data source pour availability zones
-data "aws_availability_zones" "available" {
-  state = "available"
+# Elastic IP pour avoir une IP fixe (optionnel)
+resource "aws_eip" "k3s_ip" {
+  instance = aws_instance.k3s_master.id
+  domain   = "vpc"
+  
+  tags = {
+    Name = "${var.project_name}-k3s-ip"
+  }
 }
