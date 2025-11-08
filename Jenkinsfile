@@ -1,55 +1,58 @@
 pipeline {
     agent any
     
-    environment {
-        AWS_REGION = 'us-east-1'
-        TF_VAR_project_name = 'k3s-jenkins'
-    }
-    
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', 
-                    url: 'https://github.com/votre-username/votre-repo-terraform.git'
+                checkout scm
+            }
+        }
+        
+        stage('Setup Terraform Workspace') {
+            steps {
+                dir('awstest/terraform') {
+                    sh 'terraform workspace new k3s-jenkins || true'
+                    sh 'terraform workspace select k3s-jenkins'
+                }
             }
         }
         
         stage('Terraform Init') {
             steps {
-                sh 'terraform init'
+                dir('awstest/terraform') {
+                    sh 'terraform init'
+                }
             }
         }
         
         stage('Terraform Validate') {
             steps {
-                sh 'terraform validate'
+                dir('awstest/terraform') {
+                    sh 'terraform validate'
+                }
             }
         }
         
         stage('Terraform Plan') {
             steps {
-                sh 'terraform plan -out=tfplan'
+                dir('awstest/terraform') {
+                    sh 'terraform plan'
+                }
             }
         }
         
         stage('Terraform Apply') {
             steps {
-                sh 'terraform apply -auto-approve tfplan'
+                dir('awstest/terraform') {
+                    sh 'terraform apply -auto-approve'
+                }
             }
         }
         
-        stage('Test Deployment') {
+        stage('Show Outputs') {
             steps {
-                script {
-                    def ip = sh(
-                        script: 'terraform output -raw k3s_server_public_ip',
-                        returnStdout: true
-                    ).trim()
-                    
-                    echo "K3s Server IP: ${ip}"
-                    
-                    // Test basique de connexion SSH
-                    sh "ssh -o StrictHostKeyChecking=no ubuntu@${ip} 'sudo kubectl get nodes'"
+                dir('awstest/terraform') {
+                    sh 'terraform output'
                 }
             }
         }
@@ -58,18 +61,9 @@ pipeline {
     post {
         always {
             echo 'Pipeline execution completed'
-            // Nettoyage optionnel
-            // sh 'terraform destroy -auto-approve'
         }
         success {
             echo '✅ K3s cluster deployed successfully!'
-            script {
-                def ip = sh(
-                    script: 'terraform output -raw k3s_server_public_ip',
-                    returnStdout: true
-                ).trim()
-                echo "🌐 K3s Dashboard: http://${ip}:30000"
-            }
         }
         failure {
             echo '❌ Pipeline failed!'
