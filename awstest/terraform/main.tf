@@ -44,7 +44,7 @@ resource "aws_iam_role_policy_attachment" "eks_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 }
 
-# Use existing role ARN if provided
+# Determine role ARN
 locals {
   role_arn = var.eks_role_arn != "" ? var.eks_role_arn : aws_iam_role.eks_role[0].arn
 }
@@ -58,5 +58,6 @@ resource "aws_eks_cluster" "k8s_cluster" {
     subnet_ids = aws_subnet.eks_subnets[*].id
   }
 
-  depends_on = var.eks_role_arn == "" ? [aws_iam_role_policy_attachment.eks_policy] : []
+  # Only depend on the attachment if we created it
+  depends_on = aws_iam_role_policy_attachment.eks_policy
 }
