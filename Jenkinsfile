@@ -44,27 +44,6 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
-            environment {
-                // Assure-toi que le plugin SonarQube Scanner est installé dans Jenkins
-                SCANNER_HOME = tool 'SonarQubeScanner'
-            }
-            steps {
-                echo '🔹 Running SonarQube analysis...'
-                withSonarQubeEnv("${SONARQUBE_SERVER}") {
-                    sh '''
-                        ${SCANNER_HOME}/bin/sonar-scanner \
-                            -Dsonar.projectKey=GL5-G2-Foyer \
-                            -Dsonar.projectName=GL5-G2-Foyer \
-                            -Dsonar.sources=src/main/java \
-                            -Dsonar.tests=src/test/java \
-                            -Dsonar.java.binaries=target/classes \
-                            -Dsonar.junit.reportPaths=target/surefire-reports \
-                            -Dsonar.jacoco.reportPaths=target/jacoco.exec
-                    '''
-                }
-            }
-        }
 
         stage('Quality Gate') {
             steps {
@@ -75,16 +54,6 @@ pipeline {
             }
         }
 
-        stage('Publish to Nexus') {
-            steps {
-                echo '🔹 Deploying artifact to Nexus...'
-                sh """
-                    mvn clean deploy -DskipTests \
-                        -Dnexus.url=${NEXUS_URL} \
-                        -DaltDeploymentRepository=nexus::default::${NEXUS_URL}
-                """
-            }
-        }
 
 
 
