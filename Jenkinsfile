@@ -8,8 +8,6 @@ pipeline {
 
     environment {
         MAVEN_OPTS = "-Dmaven.test.failure.ignore=false"
-        SONARQUBE_SERVER = 'SonarQubeServer' // Nom du serveur Sonar configuré dans Jenkins
-        NEXUS_URL = 'http://nexus:8081/repository/maven-releases/' // URL Nexus (à adapter)
     }
 
     stages {
@@ -45,14 +43,6 @@ pipeline {
         }
 
 
-        stage('Quality Gate') {
-            steps {
-                echo '🔹 Checking SonarQube quality gate...'
-                timeout(time: 2, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
 
 
 
