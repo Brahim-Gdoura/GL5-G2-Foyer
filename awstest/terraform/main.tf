@@ -34,7 +34,7 @@ resource "aws_internet_gateway" "main" {
 
 # 1 seul Subnet public (Gratuit)
 resource "aws_subnet" "public" {
-  vid_id                  = aws_vpc.main.id
+  vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.1.0/24"
   availability_zone       = data.aws_availability_zones.available.names[0]
   map_public_ip_on_launch = true
@@ -151,45 +151,6 @@ resource "aws_instance" "k3s_master" {
     volume_size = 20  # GB
     volume_type = "gp3"
   }
-
-  # Script d'installation K3s automatique
-  user_data = <<-EOF
-              #!/bin/bash
-              set -e
-              
-              # Mise à jour du système
-              apt-get update
-              apt-get upgrade -y
-              
-              # Installation de K3s (Kubernetes léger)
-              curl -sfL https://get.k3s.io | sh -
-              
-              # Attendre que K3s démarre
-              sleep 60
-              
-              # Créer un namespace de démo
-              /usr/local/bin/kubectl create namespace demo --kubeconfig /etc/rancher/k3s/k3s.yaml || true
-              
-              # Déployer une app de test (nginx)
-              /usr/local/bin/kubectl create deployment nginx --image=nginx:alpine --namespace=demo --kubeconfig /etc/rancher/k3s/k3s.yaml || true
-              /usr/local/bin/kubectl expose deployment nginx --port=80 --type=NodePort --namespace=demo --kubeconfig /etc/rancher/k3s/k3s.yaml || true
-              
-              # Copier le kubeconfig pour l'utilisateur ubuntu
-              mkdir -p /home/ubuntu/.kube
-              cp /etc/rancher/k3s/k3s.yaml /home/ubuntu/.kube/config
-              chown -R ubuntu:ubuntu /home/ubuntu/.kube
-              chmod 600 /home/ubuntu/.kube/config
-              
-              # Update kubeconfig with public IP
-              PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
-              sed -i "s/127.0.0.1/${PUBLIC_IP}/g" /home/ubuntu/.kube/config
-              
-              # Afficher le token pour se connecter
-              echo "K3s installé avec succès!" > /home/ubuntu/k3s-info.txt
-              echo "Public IP: ${PUBLIC_IP}" >> /home/ubuntu/k3s-info.txt
-              echo "Kubeconfig updated with public IP" >> /home/ubuntu/k3s-info.txt
-              
-              EOF
 
   tags = {
     Name = "${var.project_name}-k3s-master"
