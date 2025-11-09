@@ -1,0 +1,23 @@
+version: "3.3"
+
+services:
+  mysqldb:
+    container_name: mysqldb
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: tpachat
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
+  spring_app:
+    build: .
+    container_name: devopscontainer
+    restart: on-failure
+    ports:
+      - "9096:8083"   # 9096 externe -> 8083 interne
+    depends_on:
+      - mysqldb
