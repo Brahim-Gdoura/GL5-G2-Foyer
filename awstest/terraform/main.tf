@@ -143,7 +143,6 @@ resource "aws_instance" "k3s_master" {
   subnet_id     = aws_subnet.public.id
   
   vpc_security_group_ids = [aws_security_group.k3s_sg.id]
-  key_name               = "my-key-pair"  # Update with your key pair name
 
   root_block_device {
     volume_size = 20
