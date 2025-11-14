@@ -1,10 +1,21 @@
+terraform {
+  required_version = ">= 1.3.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
 provider "aws" {
   region = var.aws_region
 }
 
-# -----------------------------
-# 1️⃣ Création du VPC
-# -----------------------------
+# =======================================================
+# 1) VPC
+# =======================================================
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "4.0.2"
@@ -24,9 +35,9 @@ module "vpc" {
   }
 }
 
-# -----------------------------
-# 2️⃣ Création du cluster EKS
-# -----------------------------
+# =======================================================
+# 2) EKS Cluster
+# =======================================================
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "20.18.0"
@@ -34,16 +45,18 @@ module "eks" {
   cluster_name    = var.cluster_name
   cluster_version = "1.29"
 
-  vpc_id  = module.vpc.vpc_id
+  vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
-  manage_aws_auth = true
+  # New parameter replacing manage_aws_auth
+  manage_aws_auth_configmap = true
 
+  # Managed Node Groups
   eks_managed_node_groups = {
     default = {
-      min_size     = var.min_capacity
-      max_size     = var.max_capacity
-      desired_size = var.desired_capacity
+      min_size       = var.min_capacity
+      max_size       = var.max_capacity
+      desired_size   = var.desired_capacity
       instance_types = [var.instance_type]
     }
   }
@@ -54,9 +67,9 @@ module "eks" {
   }
 }
 
-# -----------------------------
-# 3️⃣ Création du repository ECR
-# -----------------------------
+# =======================================================
+# 3) ECR Repository
+# =======================================================
 resource "aws_ecr_repository" "app" {
   name                 = "${var.cluster_name}-app"
   image_tag_mutability = "MUTABLE"
