@@ -9,7 +9,7 @@ pipeline {
         gitCredential = 'github-ssh'
         gitRepo = 'git@github.com:Brahim-Gdoura/GL5-G2-Foyer.git'
         gitBranch = 'featureFoyer'
-        projectDir = 'GL5-G2-Foyer'
+        projectDir = ''
         mavenImage = 'maven:3.9.7-eclipse-temurin-17'
         sonarHostUrl = 'http://sonarqube:9000'
         dockerNetwork = 'todo-reseau'
