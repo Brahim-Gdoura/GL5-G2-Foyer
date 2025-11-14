@@ -27,7 +27,7 @@ pipeline {
             steps {
                 dir(env.projectDir) {
                     script {
-                        def dockerArgs = env.dockerNetwork?.trim() ? "--network ${env.dockerNetwork.trim()}" : ''
+                        def dockerArgs = ''
                         configFileProvider([configFile(fileId: env.mavenSettingsId, variable: 'MAVEN_SETTINGS')]) {
                             docker.image(env.mavenImage).inside(dockerArgs) {
                                 sh 'mvn clean --settings $MAVEN_SETTINGS -Dmaven.repo.local=.m2'
