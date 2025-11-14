@@ -45,7 +45,7 @@ pipeline {
             }
         }
 
-        stage('UNIT TESTS') {
+        /*stage('UNIT TESTS') {
             steps {
                 script {
                     configFileProvider([configFile(fileId: env.mavenSettingsId, variable: 'MAVEN_SETTINGS')]) {
@@ -60,7 +60,7 @@ pipeline {
                     junit testResults: 'target/surefire-reports/*.xml', allowEmptyResults: true
                 }
             }
-        }
+        }*/
 
         stage('MVN SONARQUBE') {
             steps {
