@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tpfoyer-deployment
+  name: tpfoyer
 spec:
   replicas: 2
   selector:
@@ -14,6 +14,18 @@ spec:
     spec:
       containers:
         - name: tpfoyer
-          image: 261321787194.dkr.ecr.us-east-1.amazonaws.com/tpfoyer-app:latest
+          image: IMAGE_TO_REPLACE
           ports:
             - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tpfoyer-service
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 8080
+  selector:
+    app: tpfoyer
