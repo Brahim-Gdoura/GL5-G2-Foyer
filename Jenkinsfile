@@ -10,42 +10,59 @@ pipeline {
         gitRepo = 'git@github.com:Brahim-Gdoura/GL5-G2-Foyer.git'
         gitBranch = 'featureFoyer'
         projectDir = 'GL5-G2-Foyer'
-        mavenSettingsId = '532f187c-11c7-4741-8144-c3f690b16583'
+        mavenImage = 'maven:3.9.7-eclipse-temurin-17'
         sonarHostUrl = 'http://sonarqube:9000'
+        dockerNetwork = 'todo-reseau'
+        mavenSettingsId = '532f187c-11c7-4741-8144-c3f690b16583'
     }
 
     stages {
-        stage('Checkout Git') {
+        stage('CHECKOUT GIT') {
             steps {
                 git branch: env.gitBranch, credentialsId: env.gitCredential, url: env.gitRepo
             }
         }
 
-        stage('Clean') {
+        stage('MVN CLEAN') {
             steps {
                 dir(env.projectDir) {
-                    configFileProvider([configFile(fileId: env.mavenSettingsId, variable: 'MAVEN_SETTINGS')]) {
-                        sh 'mvn clean --settings $MAVEN_SETTINGS'
+                    script {
+                        def dockerArgs = env.dockerNetwork?.trim() ? "--network ${env.dockerNetwork.trim()}" : ''
+                        configFileProvider([configFile(fileId: env.mavenSettingsId, variable: 'MAVEN_SETTINGS')]) {
+                            docker.image(env.mavenImage).inside(dockerArgs) {
+                                sh 'mvn clean --settings $MAVEN_SETTINGS -Dmaven.repo.local=.m2'
+                            }
+                        }
                     }
                 }
             }
         }
 
-        stage('Build Artifact') {
+        stage('ARTIFACT CONSTRUCTION') {
             steps {
                 dir(env.projectDir) {
-                    configFileProvider([configFile(fileId: env.mavenSettingsId, variable: 'MAVEN_SETTINGS')]) {
-                        sh 'mvn package --settings $MAVEN_SETTINGS -Dmaven.test.skip=true'
+                    script {
+                        def dockerArgs = env.dockerNetwork?.trim() ? "--network ${env.dockerNetwork.trim()}" : ''
+                        configFileProvider([configFile(fileId: env.mavenSettingsId, variable: 'MAVEN_SETTINGS')]) {
+                            docker.image(env.mavenImage).inside(dockerArgs) {
+                                sh 'mvn package --settings $MAVEN_SETTINGS -Dmaven.test.skip=true -Dmaven.repo.local=.m2'
+                            }
+                        }
                     }
                 }
             }
         }
 
-        stage('Unit Tests') {
+        stage('UNIT TESTS') {
             steps {
                 dir(env.projectDir) {
-                    configFileProvider([configFile(fileId: env.mavenSettingsId, variable: 'MAVEN_SETTINGS')]) {
-                        sh 'mvn test --settings $MAVEN_SETTINGS'
+                    script {
+                        def dockerArgs = env.dockerNetwork?.trim() ? "--network ${env.dockerNetwork.trim()}" : ''
+                        configFileProvider([configFile(fileId: env.mavenSettingsId, variable: 'MAVEN_SETTINGS')]) {
+                            docker.image(env.mavenImage).inside(dockerArgs) {
+                                sh 'mvn test --settings $MAVEN_SETTINGS -Dmaven.repo.local=.m2'
+                            }
+                        }
                     }
                 }
             }
@@ -56,34 +73,47 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
+        stage('MVN SONARQUBE') {
             steps {
                 withCredentials([string(credentialsId: 'SONAR-TOKEN', variable: 'SONAR_TOKEN')]) {
                     dir(env.projectDir) {
-                        configFileProvider([configFile(fileId: env.mavenSettingsId, variable: 'MAVEN_SETTINGS')]) {
-                            sh """
-                                mvn sonar:sonar \
-                                    --settings \$MAVEN_SETTINGS \
-                                    -Dsonar.host.url=${env.sonarHostUrl} \
-                                    -Dsonar.login=\$SONAR_TOKEN
-                            """
+                        script {
+                            def dockerArgs = env.dockerNetwork?.trim() ? "--network ${env.dockerNetwork.trim()}" : ''
+                            configFileProvider([configFile(fileId: env.mavenSettingsId, variable: 'MAVEN_SETTINGS')]) {
+                                docker.image(env.mavenImage).inside(dockerArgs) {
+                                    withEnv(["SONAR_HOST_URL=${env.sonarHostUrl}"]) {
+                                        sh '''
+                                            mvn -B sonar:sonar \
+                                              --settings $MAVEN_SETTINGS \
+                                              -Dsonar.host.url=$SONAR_HOST_URL \
+                                              -Dsonar.login=$SONAR_TOKEN \
+                                              -Dmaven.repo.local=.m2
+                                        '''
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
 
-        stage('Publish to Nexus') {
+        stage('PUBLISH TO NEXUS') {
             steps {
                 dir(env.projectDir) {
-                    configFileProvider([configFile(fileId: env.mavenSettingsId, variable: 'MAVEN_SETTINGS')]) {
-                        sh 'mvn deploy --settings $MAVEN_SETTINGS -Dmaven.test.skip=true'
+                    script {
+                        def dockerArgs = env.dockerNetwork?.trim() ? "--network ${env.dockerNetwork.trim()}" : ''
+                        configFileProvider([configFile(fileId: env.mavenSettingsId, variable: 'MAVEN_SETTINGS')]) {
+                            docker.image(env.mavenImage).inside(dockerArgs) {
+                                sh 'mvn deploy --settings $MAVEN_SETTINGS -Dmaven.test.skip=true -Dmaven.repo.local=.m2'
+                            }
+                        }
                     }
                 }
             }
         }
 
-        stage('Build Docker Image') {
+        stage('BUILD IMAGE') {
             steps {
                 script {
                     dockerImage = docker.build("${registry}:${BUILD_NUMBER}", "./${projectDir}")
@@ -91,7 +121,7 @@ pipeline {
             }
         }
 
-        stage('Push Docker Image') {
+        stage('PUSH IMAGE') {
             steps {
                 script {
                     docker.withRegistry('', registryCredential) {
@@ -101,10 +131,4 @@ pipeline {
             }
         }
     }
-
-    post {
-        success { echo 'Pipeline succeeded!' }
-        failure { echo 'Pipeline failed!' }
-    }
 }
-
