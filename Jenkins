@@ -92,7 +92,6 @@ pipeline {
                             export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDS_FILE"
                             terraform plan -var="aws_region=${AWS_REGION}" \
                                           -var="project_name=${PROJECT_NAME}" \
-                                          -var="key_pair_name=my-key-pair" \
                                           -out=tfplan
                         '''
                     }
