@@ -139,9 +139,9 @@ data "aws_ami" "ubuntu" {
 # K3s Master Instance
 resource "aws_instance" "k3s_master" {
   ami           = data.aws_ami.ubuntu.id
-  instance_type = "t2.medium"  # Upgraded for K3s
+  instance_type = "t2.medium"
   subnet_id     = aws_subnet.public.id
-  
+
   vpc_security_group_ids = [aws_security_group.k3s_sg.id]
 
   root_block_device {
@@ -153,37 +153,46 @@ resource "aws_instance" "k3s_master" {
   user_data = <<-EOF
               #!/bin/bash
               set -e
-              
+
               # Update system
               apt-get update
               apt-get upgrade -y
-              
+
               # Install K3s
               curl -sfL https://get.k3s.io | sh -
-              
+
               # Wait for K3s to start
               sleep 60
-              
+
               # Create demo namespace
               /usr/local/bin/kubectl create namespace demo --kubeconfig /etc/rancher/k3s/k3s.yaml || true
-              
-              # Deploy NGINX
-              /usr/local/bin/kubectl create deployment nginx --image=nginx:alpine --namespace=demo --kubeconfig /etc/rancher/k3s/k3s.yaml
-              /usr/local/bin/kubectl expose deployment nginx --port=80 --type=NodePort --namespace=demo --kubeconfig /etc/rancher/k3s/k3s.yaml
-              
+
+              # Deploy My App
+              /usr/local/bin/kubectl create deployment my-app \
+                --image=mohamedaminelili02/my-app:latest \
+                --namespace=demo \
+                --kubeconfig /etc/rancher/k3s/k3s.yaml
+
+              /usr/local/bin/kubectl expose deployment my-app \
+                --port=8082 \
+                --target-port=8082 \
+                --type=NodePort \
+                --namespace=demo \
+                --kubeconfig /etc/rancher/k3s/k3s.yaml
+
               # Setup kubeconfig for ubuntu user
               mkdir -p /home/ubuntu/.kube
               cp /etc/rancher/k3s/k3s.yaml /home/ubuntu/.kube/config
               chown -R ubuntu:ubuntu /home/ubuntu/.kube
               chmod 600 /home/ubuntu/.kube/config
-              
+
               # Update kubeconfig with public IP
               IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
               sed -i "s/127.0.0.1/$IP/g" /home/ubuntu/.kube/config
-              
+
               echo "K3s installed successfully!" > /home/ubuntu/k3s-info.txt
               echo "Public IP: $IP" >> /home/ubuntu/k3s-info.txt
-              echo "NGINX NodePort: check with 'kubectl get svc -n demo nginx'" >> /home/ubuntu/k3s-info.txt
+              echo "My App NodePort: check with 'kubectl get svc -n demo my-app'" >> /home/ubuntu/k3s-info.txt
               EOF
 
   tags = {
@@ -212,7 +221,7 @@ output "kubeconfig_info" {
   value       = "Kubeconfig: /home/ubuntu/.kube/config on the instance"
 }
 
-output "nginx_access" {
-  description = "How to access NGINX"
-  value       = "Get NodePort: kubectl get svc -n demo nginx --kubeconfig /home/ubuntu/.kube/config"
+output "my_app_access" {
+  description = "How to access My App"
+  value       = "Get NodePort: kubectl get svc -n demo my-app --kubeconfig /home/ubuntu/.kube/config"
 }
