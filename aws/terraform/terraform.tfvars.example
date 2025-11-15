@@ -1,0 +1,15 @@
+# AWS Configuration
+aws_region = "us-east-1"
+
+# Project Configuration
+project_name = "k3s-foyer-app"
+
+# EC2 Configuration
+instance_type = "t2.medium"
+
+# Network Configuration
+vpc_cidr           = "10.0.0.0/16"
+public_subnet_cidr = "10.0.1.0/24"
+
+# SSH Key Pair Name (must exist in AWS)
+key_pair_name = "my-key-pair"

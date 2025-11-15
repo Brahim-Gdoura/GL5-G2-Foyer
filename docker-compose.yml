@@ -1,23 +1,49 @@
-version: '3.3'
+version: '3.8'
 
-services:
-  mysqldb:
-    container_name: mysqldb
-    image: mysql:8
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: tpachat
-    volumes:
-      - ./mysql_data:/var/lib/mysql
-    ports:
-      - '3306:3306'
+
+.idea/services:
+
+.vscode/  mysqldb:
+
+*.iml    container_name: mysqldb
+
+*.iws    image: mysql:8
+
+*.ipr    restart: unless-stopped
+
+.settings/    environment:
+
+.classpath      MYSQL_ROOT_PASSWORD: root
+
+.project      MYSQL_DATABASE: tpFoyer17
+
+.git/    volumes:
+
+.gitignore      - mysql_data:/var/lib/mysql
+
+README.md    ports:
+
+*.md      - '3306:3306'
+
+.DS_Store    healthcheck:
+
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
 
   spring_app:
     build: .
-    container_name: devopscontainer
+    container_name: foyer-app
     restart: on-failure
     ports:
-      - '9096:8083' # 9096 externe -> 8083 interne
+      - '8083:8083'
     depends_on:
-      - mysqldb
+      mysqldb:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysqldb:3306/tpFoyer17?createDatabaseIfNotExist=true&useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+
+volumes:
+  mysql_data:
