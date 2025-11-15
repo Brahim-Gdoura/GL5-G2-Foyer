@@ -2,12 +2,10 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'us-east-1'
-        PROJECT_NAME = 'k3s-nginx-jenkins'
-        TERRAFORM_DIR = 'awstest/terraform'
-
-        // We keep this only if Terraform needs it, otherwise remove
-        DOCKER_IMAGE = 'mohamedaminelili02/my-app:latest'
+        AWS_REGION      = 'us-east-1'
+        PROJECT_NAME    = 'k3s-nginx-jenkins'
+        TERRAFORM_DIR   = 'awstest/terraform'
+        DOCKER_IMAGE    = 'mohamedaminelili02/my-app:latest'
     }
 
     stages {
@@ -41,17 +39,6 @@ pipeline {
 
         /* --- TERRAFORM --- */
 
-        stage('Validate Terraform Syntax') {
-            steps {
-                dir(env.TERRAFORM_DIR) {
-                    sh '''
-                        terraform validate
-                        terraform fmt -check
-                    '''
-                }
-            }
-        }
-
         stage('Terraform Init') {
             steps {
                 dir(env.TERRAFORM_DIR) {
@@ -61,6 +48,17 @@ pipeline {
                             terraform init -upgrade
                         '''
                     }
+                }
+            }
+        }
+
+        stage('Validate Terraform Syntax') {
+            steps {
+                dir(env.TERRAFORM_DIR) {
+                    sh '''
+                        terraform validate
+                        terraform fmt -check
+                    '''
                 }
             }
         }
