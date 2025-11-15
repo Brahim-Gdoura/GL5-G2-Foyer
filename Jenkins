@@ -45,24 +45,7 @@ pipeline {
             }
         }
 
-        // Docker Build & Push Stages
-        stage('Docker Build') {
-            steps {
 
-            }
-        }
-
-        stage('Docker Login') {
-            steps {
-
-            }
-        }
-
-        stage('Docker Push') {
-            steps {
-
-            }
-        }
 
         // Terraform Stages
         stage('Validate Terraform Syntax') {
