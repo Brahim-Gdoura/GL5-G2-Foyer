@@ -26,13 +26,15 @@ module "vpc" {
 # --- EKS ---
 module "eks" {
   source          = "terraform-aws-modules/eks/aws"
+  version         = "20.1.0"        # exemple version récente stable
   cluster_name    = "simple-eks"
   cluster_version = "1.28"
 
-  subnets = module.vpc.private_subnets
-  vpc_id  = module.vpc.vpc_id
+  vpc_id      = module.vpc.vpc_id
+  vpc_subnets = module.vpc.private_subnets  # <-- correct
 
-  node_groups = {
+  # Définition des nodes gérés
+  managed_node_groups = {
     default = {
       desired_capacity = 2
       max_capacity     = 3
