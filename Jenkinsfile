@@ -62,7 +62,7 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
+                withSonarQubeEnv('SonarServer') {
                     sh """
                         mvn sonar:sonar \
                             -Dsonar.projectKey=tpFoyer-17 \
