@@ -66,9 +66,9 @@
     </dependencies>
      <distributionManagement>
     <snapshotRepository>
-        <id>deploymentRepo</id>
+        <id>nexus</id>
         <name>Nexus Snapshots</name>
-        <url>http://agitated_goodall:8081/repository/maven-snapshots/</url>
+        <url>http://localhost:8081/nexus/content/repositories/snapshots/</url>
     </snapshotRepository>
 </distributionManagement>
 
