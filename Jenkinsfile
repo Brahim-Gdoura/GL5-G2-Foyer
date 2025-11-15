@@ -88,7 +88,7 @@ pipeline {
             steps {
                 script {
                     configFileProvider([configFile(fileId: env.mavenSettingsId, variable: 'MAVEN_SETTINGS')]) {
-                        docker.image(env.mavenImage).inside {
+                        docker.image(env.mavenImage).inside("--network=devnet") {
                             sh 'mvn deploy --settings $MAVEN_SETTINGS -Dmaven.test.skip=true -Dmaven.repo.local=.m2'
                         }
                     }
