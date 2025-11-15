@@ -8,7 +8,7 @@ terraform {
 }
 
 provider "aws" {
-  region = "us-east-1"
+  region = var.aws_region
 }
 
 variable "aws_region" {
@@ -19,7 +19,7 @@ variable "aws_region" {
 
 variable "project_name" {
   type        = string
-  description = "Tp Foyer"
+  description = "Project name"
   default     = "k3s-nginx-jenkins"
 }
 
@@ -146,7 +146,7 @@ resource "aws_security_group" "k3s_sg" {
 # Ubuntu AMI
 data "aws_ami" "ubuntu" {
   most_recent = true
-  owners      = ["099720109477"] # Canonical
+  owners      = ["099720109477"]
 
   filter {
     name   = "name"
@@ -167,47 +167,22 @@ resource "aws_instance" "k3s_master" {
     volume_type = "gp3"
   }
 
-  # K3s installation script
   user_data = <<-EOF
               #!/bin/bash
               set -e
-
-              # Update system
               apt-get update
               apt-get upgrade -y
-
-              # Install K3s
               curl -sfL https://get.k3s.io | sh -
-
-              # Wait for K3s to start
               sleep 60
-
-              # Create demo namespace
               /usr/local/bin/kubectl create namespace demo --kubeconfig /etc/rancher/k3s/k3s.yaml || true
-
-              # Deploy My App
-              /usr/local/bin/kubectl create deployment my-app \
-                --image=mohamedaminelili02/my-app:latest \
-                --namespace=demo \
-                --kubeconfig /etc/rancher/k3s/k3s.yaml
-
-              /usr/local/bin/kubectl expose deployment my-app \
-                --port=8082 \
-                --target-port=8082 \
-                --type=NodePort \
-                --namespace=demo \
-                --kubeconfig /etc/rancher/k3s/k3s.yaml
-
-              # Setup kubeconfig for ubuntu user
+              /usr/local/bin/kubectl create deployment my-app --image=${var.image_name} --namespace=demo --kubeconfig /etc/rancher/k3s/k3s.yaml
+              /usr/local/bin/kubectl expose deployment my-app --port=8082 --target-port=8082 --type=NodePort --namespace=demo --kubeconfig /etc/rancher/k3s/k3s.yaml
               mkdir -p /home/ubuntu/.kube
               cp /etc/rancher/k3s/k3s.yaml /home/ubuntu/.kube/config
               chown -R ubuntu:ubuntu /home/ubuntu/.kube
               chmod 600 /home/ubuntu/.kube/config
-
-              # Update kubeconfig with public IP
               IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
               sed -i "s/127.0.0.1/$IP/g" /home/ubuntu/.kube/config
-
               echo "K3s installed successfully!" > /home/ubuntu/k3s-info.txt
               echo "Public IP: $IP" >> /home/ubuntu/k3s-info.txt
               echo "My App NodePort: check with 'kubectl get svc -n demo my-app'" >> /home/ubuntu/k3s-info.txt
@@ -218,7 +193,6 @@ resource "aws_instance" "k3s_master" {
   }
 }
 
-# Availability Zones
 data "aws_availability_zones" "available" {
   state = "available"
 }
@@ -227,11 +201,6 @@ data "aws_availability_zones" "available" {
 output "k3s_master_public_ip" {
   description = "Public IP of K3s master"
   value       = aws_instance.k3s_master.public_ip
-}
-
-output "ssh_connection" {
-  description = "SSH connection command"
-  value       = "ssh -i my-key-pair.pem ubuntu@${aws_instance.k3s_master.public_ip}"
 }
 
 output "kubeconfig_info" {
