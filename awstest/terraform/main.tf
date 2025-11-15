@@ -52,41 +52,80 @@ resource "aws_subnet" "public" {
 # Route Table
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
-  route { cidr_block = "0.0.0.0/0", gateway_id = aws_internet_gateway.main.id }
-  tags  = { Name = "k3s-public-rt" }
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main.id
+  }
+
+  tags = {
+    Name = "k3s-public-rt"
+  }
 }
+
 
 resource "aws_route_table_association" "public" {
   subnet_id      = aws_subnet.public.id
   route_table_id = aws_route_table.public.id
 }
 
-# Security Group
 resource "aws_security_group" "k3s_sg" {
   name        = "k3s-sg"
   description = "Security group for K3s cluster"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description = "SSH"; from_port = 22; to_port = 22; protocol = "tcp"; cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    description = "K3s API"; from_port = 6443; to_port = 6443; protocol = "tcp"; cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    description = "HTTP"; from_port = 80; to_port = 80; protocol = "tcp"; cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    description = "HTTPS"; from_port = 443; to_port = 443; protocol = "tcp"; cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    description = "NodePort"; from_port = 30000; to_port = 32767; protocol = "tcp"; cidr_blocks = ["0.0.0.0/0"]
+    description = "SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
-  egress { from_port = 0; to_port = 0; protocol = "-1"; cidr_blocks = ["0.0.0.0/0"] }
+  ingress {
+    description = "K3s API"
+    from_port   = 6443
+    to_port     = 6443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
-  tags = { Name = "k3s-sg" }
+  ingress {
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "NodePort Services"
+    from_port   = 30000
+    to_port     = 32767
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "k3s-sg"
+  }
 }
+
 
 # Ubuntu AMI
 data "aws_ami" "ubuntu" {
