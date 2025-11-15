@@ -61,12 +61,12 @@ pipeline {
                 withCredentials([string(credentialsId: 'SONAR-TOKEN', variable: 'SONAR_TOKEN')]) {
                     script {
                         docker.image(env.mavenImage).inside("--network=devnet") {
-                            sh '''
+                            sh """
                                 mvn -B sonar:sonar \
                                   -Dsonar.host.url=${SONAR_HOST_URL} \
                                   -Dsonar.login=${SONAR_TOKEN} \
                                   -Dmaven.repo.local=.m2
-                            '''
+                            """
                         }
                     }
                 }
@@ -78,7 +78,7 @@ pipeline {
                 script {
                     echo "=== Testing Nexus connectivity from Maven container ==="
                     docker.image(env.mavenImage).inside("--network=devnet") {
-                        sh '''
+                        sh """
                             echo "1. Testing DNS resolution:"
                             ping -c 2 agitated_goodall || echo "Ping failed"
                             
@@ -89,7 +89,7 @@ pipeline {
                             echo ""
                             echo "3. Checking network connectivity:"
                             curl -I http://agitated_goodall:8081/ || echo "Root access failed"
-                        '''
+                        """
                     }
                 }
             }
@@ -101,7 +101,7 @@ pipeline {
                     echo "=== Creating Maven settings.xml with Nexus credentials ==="
                     
                     // Créer le settings.xml directement sur l'hôte Jenkins
-                    sh '''
+                    sh """
                         mkdir -p /var/jenkins_home/maven-config
                         cat > /var/jenkins_home/maven-config/settings.xml << 'SETTINGSEOF'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -121,13 +121,13 @@ SETTINGSEOF
                         
                         echo "Settings.xml created. Content:"
                         cat /var/jenkins_home/maven-config/settings.xml
-                    '''
+                    """
                     
                     echo "=== Deploying artifact to Nexus ==="
                     
                     // Déployer avec ce settings.xml
                     docker.image(env.mavenImage).inside("--network=devnet -v /var/jenkins_home/maven-config:/maven-config") {
-                        sh '''
+                        sh """
                             echo "Verifying settings.xml is accessible inside container:"
                             ls -la /maven-config/
                             cat /maven-config/settings.xml
@@ -135,7 +135,7 @@ SETTINGSEOF
                             echo ""
                             echo "Starting Maven deploy:"
                             mvn deploy --settings /maven-config/settings.xml -Dmaven.test.skip=true -Dmaven.repo.local=.m2
-                        '''
+                        """
                     }
                 }
             }
