@@ -13,7 +13,7 @@ pipeline {
         // ========= Variables natives de la 2ème pipeline =========
         MAVEN_OPTS = "-Dmaven.test.failure.ignore=false"
         SONAR_HOST_URL = "http://sonarqube:9000"
-        SONAR_AUTH_TOKEN = credentials('sonarqube_token')
+        SONAR_AUTH_TOKEN = credentials('SONAR-TOKEN')
     }
 
     stages {
