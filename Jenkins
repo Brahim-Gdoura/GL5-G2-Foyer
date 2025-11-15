@@ -11,10 +11,38 @@ pipeline {
         stage('Checkout') {
             steps {
                 git branch: 'feature/ReadMeInit',
-                url: 'https://github.com/Brahim-Gdoura/GL5-G2-Foyer.git'
+                    url: 'https://github.com/Brahim-Gdoura/GL5-G2-Foyer.git'
             }
         }
 
+        // ----------------------------
+        // Fake Docker Build & Deploy first
+        // ----------------------------
+        stage('Fake Docker Build') {
+            steps {
+                script {
+                    def randomMs = (100 + new Random().nextInt(201)) / 1000.0  // 100-300ms
+                    echo "=== Fake Docker Build (sleeping ${randomMs} seconds) ==="
+                    sh "sleep ${randomMs}"
+                    echo "=== Fake Docker Build Completed ==="
+                }
+            }
+        }
+
+        stage('Fake Docker Deploy') {
+            steps {
+                script {
+                    def randomMs = (100 + new Random().nextInt(201)) / 1000.0  // 100-300ms
+                    echo "=== Fake Docker Deploy (sleeping ${randomMs} seconds) ==="
+                    sh "sleep ${randomMs}"
+                    echo "=== Fake Docker Deploy Completed ==="
+                }
+            }
+        }
+
+        // ----------------------------
+        // Maven Build & Test
+        // ----------------------------
         stage('Maven Build') {
             steps {
                 sh '''
@@ -45,6 +73,9 @@ pipeline {
             }
         }
 
+        // ----------------------------
+        // Terraform
+        // ----------------------------
         stage('Validate Terraform Syntax') {
             steps {
                 dir(env.TERRAFORM_DIR) {
@@ -108,8 +139,6 @@ pipeline {
                         sh '''
                             export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDS_FILE"
                             terraform apply -auto-approve tfplan
-
-                            # Wait a bit for resources to be fully provisioned
                             sleep 30
                         '''
                     }
@@ -127,13 +156,29 @@ pipeline {
                         sh '''
                             export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDS_FILE"
                             echo "=== K3s Cluster Information ==="
-
-                            # Try to get outputs, but don't fail if none exist yet
-                            terraform output || echo "No outputs available yet - resources may still be initializing"
-
-                            # Alternative: Get instance info directly from state
-                            echo "=== Checking Terraform State ==="
+                            terraform output || echo "No outputs available yet"
                             terraform show -json | jq -r '.values.root_module.resources[] | select(.type=="aws_instance") | .values.public_ip' || echo "No instance found in state"
+                        '''
+                    }
+                }
+            }
+        }
+
+        // ----------------------------
+        // Terraform Destroy
+        // ----------------------------
+        stage('Terraform Destroy') {
+            steps {
+                dir(env.TERRAFORM_DIR) {
+                    withCredentials([file(
+                        credentialsId: 'aws-credentials',
+                        variable: 'AWS_CREDS_FILE'
+                    )]) {
+                        sh '''
+                            export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDS_FILE"
+                            echo "=== Destroying Terraform Infrastructure ==="
+                            terraform destroy -auto-approve
+                            echo "=== Terraform destroy completed ==="
                         '''
                     }
                 }
@@ -151,14 +196,8 @@ pipeline {
                     sh '''
                         export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDS_FILE"
                         echo "=== Final Terraform State Check ==="
-
-                        # This will work even if no outputs are defined
                         terraform state list || echo "No resources in state"
-
-                        # Try to get any available outputs
                         terraform output 2>/dev/null || echo "No outputs defined or available"
-
-                        # Show what resources were created
                         echo "=== Created Resources ==="
                         terraform show -no-color | grep -E "(aws_instance|public_ip|tags)" || echo "No resource details available"
                     '''
@@ -166,7 +205,7 @@ pipeline {
             }
         }
         success {
-            echo "✅ Pipeline completed successfully! K3s cluster with my-app deployed on port 8082!"
+            echo "✅ Pipeline completed successfully!"
         }
         failure {
             echo "❌ Pipeline failed - check the logs above for details"
