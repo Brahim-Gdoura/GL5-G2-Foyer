@@ -89,7 +89,6 @@ pipeline {
                             export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDS_FILE"
                             terraform plan -var="aws_region=${AWS_REGION}" \
                                           -var="project_name=${PROJECT_NAME}" \
-                                          -var="key_pair_name=my-key-pair" \
                                           -var="app_name=my-app" \
                                           -var="app_port=8082" \
                                           -out=tfplan
@@ -109,6 +108,9 @@ pipeline {
                         sh '''
                             export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDS_FILE"
                             terraform apply -auto-approve tfplan
+
+                            # Wait a bit for resources to be fully provisioned
+                            sleep 30
                         '''
                     }
                 }
@@ -125,7 +127,13 @@ pipeline {
                         sh '''
                             export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDS_FILE"
                             echo "=== K3s Cluster Information ==="
-                            terraform output
+
+                            # Try to get outputs, but don't fail if none exist yet
+                            terraform output || echo "No outputs available yet - resources may still be initializing"
+
+                            # Alternative: Get instance info directly from state
+                            echo "=== Checking Terraform State ==="
+                            terraform show -json | jq -r '.values.root_module.resources[] | select(.type=="aws_instance") | .values.public_ip' || echo "No instance found in state"
                         '''
                     }
                 }
@@ -142,14 +150,23 @@ pipeline {
                 )]) {
                     sh '''
                         export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDS_FILE"
-                        echo "=== Final Outputs ==="
-                        terraform output || echo "No outputs available"
+                        echo "=== Final Terraform State Check ==="
+
+                        # This will work even if no outputs are defined
+                        terraform state list || echo "No resources in state"
+
+                        # Try to get any available outputs
+                        terraform output 2>/dev/null || echo "No outputs defined or available"
+
+                        # Show what resources were created
+                        echo "=== Created Resources ==="
+                        terraform show -no-color | grep -E "(aws_instance|public_ip|tags)" || echo "No resource details available"
                     '''
                 }
             }
         }
         success {
-            echo "✅ K3s cluster with my-app deployed successfully on port 8082!"
+            echo "✅ Pipeline completed successfully! K3s cluster with my-app deployed on port 8082!"
         }
         failure {
             echo "❌ Pipeline failed - check the logs above for details"

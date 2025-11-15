@@ -148,7 +148,7 @@ data "aws_ami" "ubuntu" {
 # K3s Master Instance
 resource "aws_instance" "k3s_master" {
   ami           = data.aws_ami.ubuntu.id
-  instance_type = "t2.medium"  # Upgraded for K3s
+  instance_type = "t2.medium"
   subnet_id     = aws_subnet.public.id
 
   vpc_security_group_ids = [aws_security_group.k3s_sg.id]
@@ -219,12 +219,6 @@ variable "project_name" {
   default     = "k3s-nginx-jenkins"
 }
 
-variable "key_pair_name" {
-  description = "Key pair name"
-  type        = string
-  default     = "my-key-pair"
-}
-
 variable "app_name" {
   description = "Application name"
   type        = string
@@ -240,18 +234,13 @@ variable "app_port" {
 variable "app_image" {
   description = "Application container image"
   type        = string
-  default     = "nginx:alpine"  # You can change this to your custom app image
+  default     = "nginx:alpine"
 }
 
 # Outputs
 output "k3s_master_public_ip" {
   description = "Public IP of K3s master"
   value       = aws_instance.k3s_master.public_ip
-}
-
-output "ssh_connection" {
-  description = "SSH connection command"
-  value       = "ssh -i ${var.key_pair_name}.pem ubuntu@${aws_instance.k3s_master.public_ip}"
 }
 
 output "kubeconfig_info" {
