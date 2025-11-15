@@ -8,10 +8,6 @@ pipeline {
     }
 
     stages {
-
-        // ------------------------------------------------------
-        // GIT CHECKOUT
-        // ------------------------------------------------------
         stage('Checkout') {
             steps {
                 git branch: 'feature/ReadMeInit',
@@ -19,39 +15,12 @@ pipeline {
             }
         }
 
-        // ------------------------------------------------------
-        // DOCKER BUILD & DEPLOY (Before Terraform)
-        // ------------------------------------------------------
-        stage('Fake Docker Build') {
-            steps {
-                script {
-                    def t = (100 + new Random().nextInt(201)) / 1000.0
-                    echo "=== Fake Docker Build (sleep ${t}s) ==="
-                    sh "sleep ${t}"
-                    echo "=== Fake Docker Build Completed ==="
-                }
-            }
-        }
-
-        stage('Fake Docker Deploy') {
-            steps {
-                script {
-                    def t = (100 + new Random().nextInt(201)) / 1000.0
-                    echo "=== Fake Docker Deploy (sleep ${t}s) ==="
-                    sh "sleep ${t}"
-                    echo "=== Fake Docker Deploy Completed ==="
-                }
-            }
-        }
-
-        // ------------------------------------------------------
-        // MAVEN PIPELINE
-        // ------------------------------------------------------
         stage('Maven Build') {
             steps {
                 sh '''
-                    echo "=== Running mvn clean compile ==="
+                    echo "=== Building with Maven ==="
                     mvn clean compile
+                    echo "=== Maven build completed ==="
                 '''
             }
         }
@@ -59,8 +28,9 @@ pipeline {
         stage('Maven Package') {
             steps {
                 sh '''
-                    echo "=== Running mvn package ==="
+                    echo "=== Packaging with Maven ==="
                     mvn clean package -DskipTests
+                    echo "=== Maven packaging completed ==="
                 '''
             }
         }
@@ -68,46 +38,76 @@ pipeline {
         stage('Maven Tests') {
             steps {
                 sh '''
-                    echo "=== Running tests ==="
+                    echo "=== Running Maven Tests ==="
                     mvn test
+                    echo "=== Maven tests completed ==="
                 '''
             }
         }
 
-        // ------------------------------------------------------
-        // TERRAFORM - shared credentials export
-        // ------------------------------------------------------
-        stage('Terraform Init') {
+        // ------------------- Mock Docker Build -------------------
+        stage('Docker Build') {
+            steps {
+                sh '''
+                    echo "=== Mocking Docker Build ==="
+                    # Random wait between 100ms and 300ms
+                    WAIT_MS=$((RANDOM % 201 + 100))
+                    echo "Waiting for ${WAIT_MS}ms to simulate Docker build"
+                    sleep_time=$(echo "scale=3; ${WAIT_MS}/1000" | awk '{printf "%.3f", $1}')
+                    sleep $sleep_time
+                    echo "=== Mock Docker Build Completed ==="
+                '''
+            }
+        }
+
+        // ------------------- Mock Docker Deploy -------------------
+        stage('Docker Push') {
+            steps {
+                sh '''
+                    echo "=== Mocking Docker Deploy ==="
+                    # Random wait between 100ms and 300ms
+                    WAIT_MS=$((RANDOM % 201 + 100))
+                    echo "Waiting for ${WAIT_MS}ms to simulate Docker deploy"
+                    sleep_time=$(echo "scale=3; ${WAIT_MS}/1000" | awk '{printf "%.3f", $1}')
+                    sleep $sleep_time
+                    echo "=== Mock Docker Deploy Completed ==="
+                '''
+            }
+        }
+
+        // ------------------- Terraform Stages -------------------
+        stage('Validate Terraform Syntax') {
             steps {
                 dir(env.TERRAFORM_DIR) {
                     withCredentials([
-                        usernamePassword(
-                            credentialsId: 'aws-credentials',
-                            usernameVariable: 'AWS_ACCESS_KEY_ID',
-                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                        )
+                        string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                        string(credentialsId: 'AWS_SESSION_TOKEN', variable: 'AWS_SESSION_TOKEN')
                     ]) {
                         sh '''
-                            echo "=== Initializing Terraform ==="
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                            export AWS_REGION=${AWS_REGION}
-
-                            terraform init -upgrade
+                            echo "=== Validating Terraform syntax ==="
+                            terraform validate
+                            terraform fmt -check
+                            echo "=== Syntax validation passed ==="
                         '''
                     }
                 }
             }
         }
 
-        stage('Validate Terraform Syntax') {
+        stage('Terraform Init') {
             steps {
                 dir(env.TERRAFORM_DIR) {
-                    sh '''
-                        echo "=== Validating Terraform ==="
-                        terraform validate
-                        terraform fmt -check
-                    '''
+                    withCredentials([
+                        string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                        string(credentialsId: 'AWS_SESSION_TOKEN', variable: 'AWS_SESSION_TOKEN')
+                    ]) {
+                        sh '''
+                            echo "=== Initializing Terraform ==="
+                            terraform init -upgrade
+                        '''
+                    }
                 }
             }
         }
@@ -116,23 +116,16 @@ pipeline {
             steps {
                 dir(env.TERRAFORM_DIR) {
                     withCredentials([
-                        usernamePassword(
-                            credentialsId: 'aws-credentials',
-                            usernameVariable: 'AWS_ACCESS_KEY_ID',
-                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                        )
+                        string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                        string(credentialsId: 'AWS_SESSION_TOKEN', variable: 'AWS_SESSION_TOKEN')
                     ]) {
                         sh '''
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                            export AWS_REGION=${AWS_REGION}
-
-                            terraform plan \
-                                -var="aws_region=${AWS_REGION}" \
-                                -var="project_name=${PROJECT_NAME}" \
-                                -var="app_name=my-app" \
-                                -var="app_port=8082" \
-                                -out=tfplan
+                            terraform plan -var="aws_region=${AWS_REGION}" \
+                                          -var="project_name=${PROJECT_NAME}" \
+                                          -var="app_name=my-app" \
+                                          -var="app_port=8082" \
+                                          -out=tfplan
                         '''
                     }
                 }
@@ -143,19 +136,13 @@ pipeline {
             steps {
                 dir(env.TERRAFORM_DIR) {
                     withCredentials([
-                        usernamePassword(
-                            credentialsId: 'aws-credentials',
-                            usernameVariable: 'AWS_ACCESS_KEY_ID',
-                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                        )
+                        string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                        string(credentialsId: 'AWS_SESSION_TOKEN', variable: 'AWS_SESSION_TOKEN')
                     ]) {
                         sh '''
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                            export AWS_REGION=${AWS_REGION}
-
                             terraform apply -auto-approve tfplan
-                            sleep 20
+                            sleep 30
                         '''
                     }
                 }
@@ -166,46 +153,33 @@ pipeline {
             steps {
                 dir(env.TERRAFORM_DIR) {
                     withCredentials([
-                        usernamePassword(
-                            credentialsId: 'aws-credentials',
-                            usernameVariable: 'AWS_ACCESS_KEY_ID',
-                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                        )
+                        string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                        string(credentialsId: 'AWS_SESSION_TOKEN', variable: 'AWS_SESSION_TOKEN')
                     ]) {
                         sh '''
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                            export AWS_REGION=${AWS_REGION}
-
-                            echo "=== Terraform Output ==="
-                            terraform output || echo "No outputs"
+                            echo "=== K3s Cluster Information ==="
+                            terraform output || echo "No outputs available yet"
+                            terraform show -json | jq -r '.values.root_module.resources[] | select(.type=="aws_instance") | .values.public_ip' || echo "No instance found in state"
                         '''
                     }
                 }
             }
         }
 
-        // ------------------------------------------------------
-        // TERRAFORM DESTROY (End of pipeline)
-        // ------------------------------------------------------
+        // ------------------- Terraform Destroy -------------------
         stage('Terraform Destroy') {
             steps {
                 dir(env.TERRAFORM_DIR) {
                     withCredentials([
-                        usernamePassword(
-                            credentialsId: 'aws-credentials',
-                            usernameVariable: 'AWS_ACCESS_KEY_ID',
-                            passwordVariable: 'AWS_SECRET_ACCESS_KEY'
-                        )
+                        string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                        string(credentialsId: 'AWS_SESSION_TOKEN', variable: 'AWS_SESSION_TOKEN')
                     ]) {
                         sh '''
-                            echo "=== Destroying infrastructure ==="
-                            export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
-                            export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
-                            export AWS_REGION=${AWS_REGION}
-
+                            echo "=== Destroying Terraform Resources ==="
                             terraform destroy -auto-approve
-                            echo "=== Destroy completed ==="
+                            echo "=== Terraform Destroy Completed ==="
                         '''
                     }
                 }
@@ -213,18 +187,29 @@ pipeline {
         }
     }
 
-    // ------------------------------------------------------
-    // POST ACTIONS
-    // ------------------------------------------------------
     post {
         always {
-            echo "=== Pipeline Finished ==="
+            dir(env.TERRAFORM_DIR) {
+                withCredentials([
+                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: 'AWS_SESSION_TOKEN', variable: 'AWS_SESSION_TOKEN')
+                ]) {
+                    sh '''
+                        echo "=== Final Terraform State Check ==="
+                        terraform state list || echo "No resources in state"
+                        terraform output 2>/dev/null || echo "No outputs available"
+                        echo "=== Created Resources ==="
+                        terraform show -no-color | grep -E "(aws_instance|public_ip|tags)" || echo "No resource details available"
+                    '''
+                }
+            }
         }
         success {
-            echo "✅ SUCCESS — Infrastructure destroyed and pipeline finished!"
+            echo "✅ Pipeline completed successfully!"
         }
         failure {
-            echo "❌ FAILURE — Check logs!"
+            echo "❌ Pipeline failed - check the logs above for details"
         }
     }
 }
