@@ -67,7 +67,7 @@ pipeline {
                 withCredentials([string(credentialsId: 'SONAR-TOKEN', variable: 'SONAR_TOKEN')]) {
                     script {
                         configFileProvider([configFile(fileId: env.mavenSettingsId, variable: 'MAVEN_SETTINGS')]) {
-                            docker.image(env.mavenImage).inside {
+                            docker.image(env.mavenImage).inside("--network=devnet") {
                                 withEnv(["SONAR_HOST_URL=${env.sonarHostUrl}"]) {
                                     sh '''
                                         mvn -B sonar:sonar \
