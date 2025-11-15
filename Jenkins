@@ -2,48 +2,94 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION      = 'us-east-1'
-        PROJECT_NAME    = 'k3s-nginx-jenkins'
-        TERRAFORM_DIR   = 'awstest/terraform'
-        DOCKER_IMAGE    = 'mohamedaminelili02/my-app:latest'
+        AWS_REGION = 'us-east-1'
+        PROJECT_NAME = 'k3s-nginx-jenkins'
+        TERRAFORM_DIR = 'awstest/terraform'
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
+        DOCKER_IMAGE = 'mohamedaminelili02/my-app:latest'
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 git branch: 'feature/ReadMeInit',
-                    url: 'https://github.com/Brahim-Gdoura/GL5-G2-Foyer.git'
+                url: 'https://github.com/Brahim-Gdoura/GL5-G2-Foyer.git'
             }
         }
 
-        /* --- MAVEN --- */
-
+        // Maven Build & Test Stages
         stage('Maven Build') {
             steps {
-                sh 'mvn clean compile -f pom.xml'
+                script {
+                    echo "=== Building with Maven ==="
+                    sh 'mvn clean compile -f pom.xml'
+                }
             }
         }
 
         stage('Maven Test') {
             steps {
-                sh 'mvn test -f pom.xml'
+                script {
+                    echo "=== Running Tests with Maven ==="
+                    sh 'mvn test -f pom.xml'
+                }
             }
         }
 
         stage('Maven Package') {
             steps {
-                sh 'mvn package -f pom.xml -DskipTests'
+                script {
+                    echo "=== Packaging with Maven ==="
+                    sh 'mvn package -f pom.xml -DskipTests'
+                }
             }
         }
 
-        /* --- TERRAFORM --- */
+        // Docker Build & Push Stages
+        stage('Docker Build') {
+            steps {
+
+            }
+        }
+
+        stage('Docker Login') {
+            steps {
+
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+
+            }
+        }
+
+        // Terraform Stages
+        stage('Validate Terraform Syntax') {
+            steps {
+                dir(env.TERRAFORM_DIR) {
+                    sh '''
+                        echo "=== Validating Terraform syntax ==="
+                        terraform validate
+
+                        echo "=== Checking Terraform format ==="
+                        terraform fmt -check
+
+                        echo "=== Syntax validation passed ==="
+                    '''
+                }
+            }
+        }
 
         stage('Terraform Init') {
             steps {
                 dir(env.TERRAFORM_DIR) {
-                    withCredentials([file(credentialsId: 'aws-credentials', variable: 'AWS_CREDS_FILE')]) {
+                    withCredentials([file(
+                        credentialsId: 'aws-credentials',
+                        variable: 'AWS_CREDS_FILE'
+                    )]) {
                         sh '''
+                            echo "=== Initializing Terraform ==="
                             export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDS_FILE"
                             terraform init -upgrade
                         '''
@@ -52,26 +98,18 @@ pipeline {
             }
         }
 
-        stage('Validate Terraform Syntax') {
-            steps {
-                dir(env.TERRAFORM_DIR) {
-                    sh '''
-                        terraform validate
-                        terraform fmt -check
-                    '''
-                }
-            }
-        }
-
         stage('Terraform Plan') {
             steps {
                 dir(env.TERRAFORM_DIR) {
-                    withCredentials([file(credentialsId: 'aws-credentials', variable: 'AWS_CREDS_FILE')]) {
+                    withCredentials([file(
+                        credentialsId: 'aws-credentials',
+                        variable: 'AWS_CREDS_FILE'
+                    )]) {
                         sh '''
                             export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDS_FILE"
                             terraform plan -var="aws_region=${AWS_REGION}" \
                                           -var="project_name=${PROJECT_NAME}" \
-                                          -var="image_name=${DOCKER_IMAGE}" \
+                                          -var="key_pair_name=my-key-pair" \
                                           -out=tfplan
                         '''
                     }
@@ -82,7 +120,10 @@ pipeline {
         stage('Terraform Apply') {
             steps {
                 dir(env.TERRAFORM_DIR) {
-                    withCredentials([file(credentialsId: 'aws-credentials', variable: 'AWS_CREDS_FILE')]) {
+                    withCredentials([file(
+                        credentialsId: 'aws-credentials',
+                        variable: 'AWS_CREDS_FILE'
+                    )]) {
                         sh '''
                             export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDS_FILE"
                             terraform apply -auto-approve tfplan
@@ -95,9 +136,13 @@ pipeline {
         stage('Get Cluster Info') {
             steps {
                 dir(env.TERRAFORM_DIR) {
-                    withCredentials([file(credentialsId: 'aws-credentials', variable: 'AWS_CREDS_FILE')]) {
+                    withCredentials([file(
+                        credentialsId: 'aws-credentials',
+                        variable: 'AWS_CREDS_FILE'
+                    )]) {
                         sh '''
                             export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDS_FILE"
+                            echo "=== K3s Cluster Information ==="
                             terraform output
                         '''
                     }
@@ -109,16 +154,23 @@ pipeline {
     post {
         always {
             dir(env.TERRAFORM_DIR) {
-                withCredentials([file(credentialsId: 'aws-credentials', variable: 'AWS_CREDS_FILE')]) {
+                withCredentials([file(
+                    credentialsId: 'aws-credentials',
+                    variable: 'AWS_CREDS_FILE'
+                )]) {
                     sh '''
                         export AWS_SHARED_CREDENTIALS_FILE="$AWS_CREDS_FILE"
-                        terraform output || true
+                        echo "=== Final Outputs ==="
+                        terraform output || echo "No outputs available"
                     '''
                 }
             }
+
+            // Clean up Docker credentials
+            sh 'docker logout'
         }
         success {
-            echo "✅ Pipeline completed successfully!"
+            echo "✅ Pipeline completed successfully! Application built, tested, and deployed."
         }
         failure {
             echo "❌ Pipeline failed - check the logs above for details"
