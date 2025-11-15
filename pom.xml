@@ -68,7 +68,7 @@
     <snapshotRepository>
         <id>nexus</id>
         <name>Nexus Snapshots</name>
-        <url>http://agitated_goodall:8081/nexus/content/repositories/snapshots/</url>
+        <url>http://agitated_goodall:8081/nexus/content/repositories/maven-snapshots/</url>
     </snapshotRepository>
 </distributionManagement>
 
