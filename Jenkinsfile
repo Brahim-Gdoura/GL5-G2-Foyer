@@ -79,7 +79,7 @@ pipeline {
             }
         }
 
-       /* stage('Quality Gate') {
+        /* stage('Quality Gate') {
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
@@ -103,10 +103,14 @@ pipeline {
             }
         }
 
-        stage('Deploy with Docker Compose') {
+        stage('Push Docker Image') {
             steps {
-                sh 'docker-compose down || true'
-                sh 'docker-compose up -d --build'
+                withCredentials([usernamePassword(credentialsId: 'dockerHub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh """
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        docker push ${registry}:latest
+                    """
+                }
             }
         }
     }
@@ -123,7 +127,3 @@ pipeline {
         }
     }
 }
-
-
-
-
