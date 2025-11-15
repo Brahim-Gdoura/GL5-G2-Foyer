@@ -11,6 +11,24 @@ provider "aws" {
   region = "us-east-1"
 }
 
+variable "aws_region" {
+  type        = string
+  description = "AWS region to deploy resources"
+  default     = "us-east-1"
+}
+
+variable "project_name" {
+  type        = string
+  description = "Tp Foyer"
+  default     = "k3s-nginx-jenkins"
+}
+
+variable "image_name" {
+  type        = string
+  description = "Docker image for the app"
+  default     = "mohamedaminelili02/my-app:latest"
+}
+
 # VPC
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
