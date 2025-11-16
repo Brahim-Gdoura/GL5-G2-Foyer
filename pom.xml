@@ -15,6 +15,9 @@
     <description>tpFoyer-17</description>
     <properties>
         <java.version>17</java.version>
+        <!-- Default alt deployment repository (snapshots). Override via -DaltDeploymentRepository or -DperformDeploy=true in CI -->
+        <altDeploymentRepository>nexus::default::http://nexus:8081/repository/maven-snapshots/</altDeploymentRepository>
+        <performDeploy>false</performDeploy>
     </properties>
     <dependencies>
         <dependency>
@@ -63,6 +66,19 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <distributionManagement>
+        <repository>
+            <id>nexus</id>
+            <name>Release Repository</name>
+            <url>http://nexus:8081/repository/maven-releases/</url>
+        </repository>
+        <snapshotRepository>
+            <id>nexus</id>
+            <name>Snapshot Repository</name>
+            <url>http://nexus:8081/repository/maven-snapshots/</url>
+        </snapshotRepository>
+    </distributionManagement>
 
     <build>
         <plugins>
@@ -132,5 +148,29 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>deploy-to-nexus</id>
+            <activation>
+                <property>
+                    <name>performDeploy</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-deploy-plugin</artifactId>
+                        <version>3.1.1</version>
+                        <configuration>
+                            <altDeploymentRepository>${altDeploymentRepository}</altDeploymentRepository>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>
