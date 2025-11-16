@@ -11,6 +11,7 @@ import tn.esprit.tpfoyer17.entities.enumerations.TypeChambre;
 import tn.esprit.tpfoyer17.repositories.ChambreRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @AllArgsConstructor
@@ -32,16 +33,24 @@ public class ChambreService implements IChambreService{
     public List<Chambre> getAllChambres() {
         log.info("getAllChambres called");
         List<Chambre> result = (List<Chambre>) chambreRepository.findAll();
-        log.info("getAllChambres returned {} items", result == null ? 0 : result.size());
+        // findAll() from Spring Data returns an empty (non-null) List when there are no results,
+        // so checking for null is unnecessary and the previous ternary was flagged as always false.
+        log.info("getAllChambres returned {} items", result.size());
         if (log.isDebugEnabled()) log.debug("getAllChambres result={}", result);
         return result;
     }
     @Override
     public Chambre getChambreById(long idChambre) {
         log.info("getChambreById called with id={}", idChambre);
-        Chambre c = chambreRepository.findById(idChambre).get();
-        log.info("getChambreById result={}", c);
-        return c;
+        Optional<Chambre> opt = chambreRepository.findById(idChambre);
+        if (opt.isPresent()) {
+            Chambre c = opt.get();
+            log.info("getChambreById result={}", c);
+            return c;
+        } else {
+            log.warn("getChambreById: no Chambre found with id={}", idChambre);
+            return null;
+        }
     }
     @Override
     public void deleteChambre(long idChambre) {
