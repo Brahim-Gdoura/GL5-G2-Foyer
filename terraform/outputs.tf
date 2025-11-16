@@ -15,7 +15,7 @@ output "cluster_certificate_authority_data" {
 }
 
 output "cluster_security_group_id" {
-  description = "Security group ID attached to the EKS cluster"
+  description = "Security group ID"
   value       = module.eks.cluster_security_group_id
 }
 

@@ -15,180 +15,78 @@ terraform {
 
 provider "aws" {
   region = var.region
+
+  skip_metadata_api_check     = true
+  skip_region_validation      = false
+  skip_credentials_validation = false
+}
+
+# Définir les AZs localement (évite les problèmes de permissions)
+locals {
+  azs = ["us-east-1a", "us-east-1b"]
 }
 
 # --- VPC ---
-resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16"
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "5.1.2"
+
+  name = "simple-vpc"
+  cidr = "10.0.0.0/16"
+
+  azs             = local.azs
+  public_subnets  = ["10.0.1.0/24", "10.0.2.0/24"]
+  private_subnets = ["10.0.3.0/24", "10.0.4.0/24"]
+
+  enable_nat_gateway   = true
+  single_nat_gateway   = true
   enable_dns_hostnames = true
-  enable_dns_support   = true
 
-  tags = {
-    Name = "simple-vpc"
+  public_subnet_tags = {
+    "kubernetes.io/role/elb"           = "1"
     "kubernetes.io/cluster/simple-eks" = "shared"
   }
-}
 
-# --- Internet Gateway ---
-resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
-}
-
-# --- Public Subnets ---
-resource "aws_subnet" "public" {
-  count                   = 2
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.0.${count.index + 1}.0/24"
-  availability_zone       = "us-east-1${["a", "b"][count.index]}"
-  map_public_ip_on_launch = true
-
-  tags = {
-    Name                              = "public-${count.index + 1}"
-    "kubernetes.io/role/elb"          = "1"
+  private_subnet_tags = {
+    "kubernetes.io/role/internal-elb"  = "1"
     "kubernetes.io/cluster/simple-eks" = "shared"
   }
-}
-
-# --- Private Subnets ---
-resource "aws_subnet" "private" {
-  count             = 2
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.${count.index + 3}.0/24"
-  availability_zone = "us-east-1${["a", "b"][count.index]}"
 
   tags = {
-    Name                                   = "private-${count.index + 1}"
-    "kubernetes.io/role/internal-elb"      = "1"
-    "kubernetes.io/cluster/simple-eks"     = "shared"
+    Environment = "dev"
+    Terraform   = "true"
   }
-}
-
-# --- NAT Gateway ---
-resource "aws_eip" "nat" {
-  domain = "vpc"
-}
-
-resource "aws_nat_gateway" "main" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public[0].id
-}
-
-# --- Route Tables ---
-resource "aws_route_table" "public" {
-  vpc_id = aws_vpc.main.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.main.id
-  }
-}
-
-resource "aws_route_table" "private" {
-  vpc_id = aws_vpc.main.id
-
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main.id
-  }
-}
-
-resource "aws_route_table_association" "public" {
-  count          = 2
-  subnet_id      = aws_subnet.public[count.index].id
-  route_table_id = aws_route_table.public.id
-}
-
-resource "aws_route_table_association" "private" {
-  count          = 2
-  subnet_id      = aws_subnet.private[count.index].id
-  route_table_id = aws_route_table.private.id
-}
-
-# --- EKS Cluster IAM Role ---
-resource "aws_iam_role" "eks_cluster" {
-  name = "simple-eks-cluster-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "eks.amazonaws.com"
-      }
-    }]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
-  role       = aws_iam_role.eks_cluster.name
 }
 
 # --- EKS Cluster ---
-resource "aws_eks_cluster" "main" {
-  name     = "simple-eks"
-  role_arn = aws_iam_role.eks_cluster.arn
-  version  = "1.27"  # ✅ Version 1.27 plus stable sur AWS Academy
+module "eks" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "19.21.0"
 
-  vpc_config {
-    subnet_ids              = aws_subnet.private[*].id
-    endpoint_public_access  = true
-    endpoint_private_access = true
+  cluster_name    = "simple-eks"
+  cluster_version = "1.28"
+
+  vpc_id     = module.vpc.vpc_id
+  subnet_ids = module.vpc.private_subnets
+
+  cluster_endpoint_public_access = true
+
+  eks_managed_node_groups = {
+    default = {
+      min_size     = 1
+      max_size     = 2
+      desired_size = 2
+
+      instance_types = ["t3.medium"]
+      capacity_type  = "ON_DEMAND"
+
+      iam_role_attach_cni_policy = true
+    }
   }
 
-  depends_on = [aws_iam_role_policy_attachment.eks_cluster_policy]
-}
+  cluster_enabled_log_types = []
 
-# --- Node Group IAM Role ---
-resource "aws_iam_role" "eks_nodes" {
-  name = "simple-eks-node-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "ec2.amazonaws.com"
-      }
-    }]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "eks_worker_node_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-  role       = aws_iam_role.eks_nodes.name
-}
-
-resource "aws_iam_role_policy_attachment" "eks_cni_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-  role       = aws_iam_role.eks_nodes.name
-}
-
-resource "aws_iam_role_policy_attachment" "eks_registry_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-  role       = aws_iam_role.eks_nodes.name
-}
-
-# --- EKS Node Group ---
-resource "aws_eks_node_group" "main" {
-  cluster_name    = aws_eks_cluster.main.name
-  node_group_name = "simple-node-group"
-  node_role_arn   = aws_iam_role.eks_nodes.arn
-  subnet_ids      = aws_subnet.private[*].id
-
-  scaling_config {
-    desired_size = 2
-    max_size     = 2
-    min_size     = 1
+  tags = {
+    Environment = "dev"
   }
-
-  instance_types = ["t3.medium"]
-
-  depends_on = [
-    aws_iam_role_policy_attachment.eks_worker_node_policy,
-    aws_iam_role_policy_attachment.eks_cni_policy,
-    aws_iam_role_policy_attachment.eks_registry_policy,
-  ]
 }
