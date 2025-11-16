@@ -1,5 +1,4 @@
-FROM eclipse-temurin:8-jdk-alpine
+FROM eclipse-temurin:17-jdk-alpine
 EXPOSE 8083
-ADD target/app.war /app.war
-ENTRYPOINT ["java","-jar","/app.war"]
-
+ADD target/app.jar /app.jar
+ENTRYPOINT ["java","-jar","/app.jar"]
