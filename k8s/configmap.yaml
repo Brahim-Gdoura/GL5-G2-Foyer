@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tpfoyer-config
+data:
+  SPRING_DATASOURCE_URL: "jdbc:mysql://mysql-service:3306/foyer"
+  SPRING_DATASOURCE_USERNAME: "foyer_user"
+  SPRING_DATASOURCE_PASSWORD: "foyer_pass"
+  SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+  SPRING_JPA_SHOW_SQL: "true"

@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: tpfoyer
+  labels:
+    app: tpfoyer
 spec:
   replicas: 2
   selector:
@@ -12,20 +14,64 @@ spec:
       labels:
         app: tpfoyer
     spec:
+      # ✅ initContainers au même niveau que containers
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.28
+          command: ['sh', '-c', 'until nc -z mysql-service 3306; do echo waiting for mysql; sleep 2; done;']
+
       containers:
         - name: tpfoyer
           image: IMAGE_TO_REPLACE
           ports:
             - containerPort: 8080
+              protocol: TCP
+
+          # Variables d'environnement depuis le ConfigMap
+          envFrom:
+            - configMapRef:
+                name: tpfoyer-config
+
+          # Ressources
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+
+          # Health checks
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: tpfoyer-service
+  labels:
+    app: tpfoyer
 spec:
   type: LoadBalancer
   ports:
     - port: 80
       targetPort: 8082
+      protocol: TCP
   selector:
     app: tpfoyer
