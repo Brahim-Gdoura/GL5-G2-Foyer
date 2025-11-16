@@ -17,6 +17,14 @@ provider "aws" {
   region = var.region
 }
 
+# Récupérer le rôle LabRole existant
+data "aws_iam_role" "lab_role" {
+  name = "LabRole"
+}
+
+# Récupérer l'account ID
+data "aws_caller_identity" "current" {}
+
 # --- VPC ---
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
@@ -24,7 +32,7 @@ resource "aws_vpc" "main" {
   enable_dns_support   = true
 
   tags = {
-    Name                              = "simple-vpc"
+    Name = "simple-vpc"
     "kubernetes.io/cluster/simple-eks" = "shared"
   }
 }
@@ -47,8 +55,8 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name                              = "simple-public-${count.index + 1}"
-    "kubernetes.io/role/elb"          = "1"
+    Name = "simple-public-${count.index + 1}"
+    "kubernetes.io/role/elb" = "1"
     "kubernetes.io/cluster/simple-eks" = "shared"
   }
 }
@@ -61,13 +69,13 @@ resource "aws_subnet" "private" {
   availability_zone = "us-east-1${count.index == 0 ? "a" : "b"}"
 
   tags = {
-    Name                                   = "simple-private-${count.index + 1}"
-    "kubernetes.io/role/internal-elb"      = "1"
-    "kubernetes.io/cluster/simple-eks"     = "shared"
+    Name = "simple-private-${count.index + 1}"
+    "kubernetes.io/role/internal-elb" = "1"
+    "kubernetes.io/cluster/simple-eks" = "shared"
   }
 }
 
-# NAT Gateway
+# Elastic IP for NAT
 resource "aws_eip" "nat" {
   vpc = true
 
@@ -76,6 +84,7 @@ resource "aws_eip" "nat" {
   }
 }
 
+# NAT Gateway
 resource "aws_nat_gateway" "main" {
   allocation_id = aws_eip.nat.id
   subnet_id     = aws_subnet.public[0].id
@@ -126,84 +135,47 @@ resource "aws_route_table_association" "private" {
   route_table_id = aws_route_table.private.id
 }
 
-# --- EKS Cluster IAM Role ---
-resource "aws_iam_role" "eks_cluster" {
-  name = "simple-eks-cluster-role"
+# Security Group pour EKS
+resource "aws_security_group" "eks_cluster" {
+  name        = "simple-eks-cluster-sg"
+  description = "Security group for EKS cluster"
+  vpc_id      = aws_vpc.main.id
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "eks.amazonaws.com"
-      }
-    }]
-  })
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "simple-eks-cluster-sg"
+  }
 }
 
-resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
-  role       = aws_iam_role.eks_cluster.name
-}
-
-# --- EKS Cluster ---
+# EKS Cluster utilisant LabRole
 resource "aws_eks_cluster" "main" {
   name     = "simple-eks"
-  role_arn = aws_iam_role.eks_cluster.arn
+  role_arn = data.aws_iam_role.lab_role.arn
   version  = "1.27"
 
   vpc_config {
     subnet_ids              = aws_subnet.private[*].id
     endpoint_public_access  = true
     endpoint_private_access = true
+    security_group_ids      = [aws_security_group.eks_cluster.id]
   }
-
-  depends_on = [
-    aws_iam_role_policy_attachment.eks_cluster_policy
-  ]
 
   tags = {
     Name = "simple-eks"
   }
 }
 
-# --- Node Group IAM Role ---
-resource "aws_iam_role" "eks_nodes" {
-  name = "simple-eks-node-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "ec2.amazonaws.com"
-      }
-    }]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "eks_worker_node_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-  role       = aws_iam_role.eks_nodes.name
-}
-
-resource "aws_iam_role_policy_attachment" "eks_cni_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-  role       = aws_iam_role.eks_nodes.name
-}
-
-resource "aws_iam_role_policy_attachment" "eks_container_registry_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-  role       = aws_iam_role.eks_nodes.name
-}
-
-# --- EKS Node Group ---
+# EKS Node Group utilisant LabRole
 resource "aws_eks_node_group" "main" {
   cluster_name    = aws_eks_cluster.main.name
   node_group_name = "simple-node-group"
-  node_role_arn   = aws_iam_role.eks_nodes.arn
+  node_role_arn   = data.aws_iam_role.lab_role.arn
   subnet_ids      = aws_subnet.private[*].id
 
   scaling_config {
@@ -217,12 +189,6 @@ resource "aws_eks_node_group" "main" {
   update_config {
     max_unavailable = 1
   }
-
-  depends_on = [
-    aws_iam_role_policy_attachment.eks_worker_node_policy,
-    aws_iam_role_policy_attachment.eks_cni_policy,
-    aws_iam_role_policy_attachment.eks_container_registry_policy,
-  ]
 
   tags = {
     Name = "simple-node-group"
