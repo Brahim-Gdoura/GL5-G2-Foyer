@@ -26,6 +26,6 @@ spec:
   type: LoadBalancer
   ports:
     - port: 80
-      targetPort: 8080
+      targetPort: 8082
   selector:
     app: tpfoyer
