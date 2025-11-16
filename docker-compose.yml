@@ -18,6 +18,6 @@ services:
     container_name: devopscontainer
     restart: on-failure
     ports:
-      - "9096:8083"   # 9096 externe -> 8083 interne
+      - "9096:8082"   # 9096 externe -> 8082 interne
     depends_on:
       - mysqldb
