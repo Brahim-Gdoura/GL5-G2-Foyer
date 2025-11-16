@@ -21,51 +21,89 @@ public class ChambreService implements IChambreService{
 
     @Override
     public Chambre addChambre(Chambre chambre) {
-        return chambreRepository.save(chambre);
+        log.info("addChambre called with chambre={}", chambre);
+        Chambre saved = chambreRepository.save(chambre);
+        log.info("addChambre saved chambre={}", saved);
+        return saved;
 
 
     }
     @Override
     public List<Chambre> getAllChambres() {
-        return (List<Chambre>) chambreRepository.findAll();
+        log.info("getAllChambres called");
+        List<Chambre> result = (List<Chambre>) chambreRepository.findAll();
+        log.info("getAllChambres returned {} items", result == null ? 0 : result.size());
+        if (log.isDebugEnabled()) log.debug("getAllChambres result={}", result);
+        return result;
     }
     @Override
     public Chambre getChambreById(long idChambre) {
-        return chambreRepository.findById(idChambre).get();
+        log.info("getChambreById called with id={}", idChambre);
+        Chambre c = chambreRepository.findById(idChambre).get();
+        log.info("getChambreById result={}", c);
+        return c;
     }
     @Override
     public void deleteChambre(long idChambre) {
+        log.info("deleteChambre called with id={}", idChambre);
         chambreRepository.deleteById(idChambre);
+        log.info("deleteChambre completed for id={}", idChambre);
     }
     @Override
     public Chambre updateChambre(Chambre chambre) {
-        return chambreRepository.save(chambre);
+        log.info("updateChambre called with chambre={}", chambre);
+        Chambre updated = chambreRepository.save(chambre);
+        log.info("updateChambre updated chambre={}", updated);
+        return updated;
     }
 
     @Override
     public List<Chambre> getChambresParNomUniversite(String nomUniversite) {
-        return chambreRepository.findByBlocFoyerUniversiteNomUniversite(nomUniversite);
+        log.info("getChambresParNomUniversite called with nomUniversite={}", nomUniversite);
+        List<Chambre> result = chambreRepository.findByBlocFoyerUniversiteNomUniversite(nomUniversite);
+        log.info("getChambresParNomUniversite returned {} items", result == null ? 0 : result.size());
+        if (log.isDebugEnabled()) log.debug("getChambresParNomUniversite result={}", result);
+        return result;
     }
 
     @Override
     public List<Chambre> getChambresParBlocEtTypeKeyWord(long idBloc, TypeChambre typeC) {
-        return chambreRepository.findByBlocIdBlocAndTypeChambre(idBloc,typeC);
+        log.info("getChambresParBlocEtTypeKeyWord called with idBloc={}, type={}", idBloc, typeC);
+        List<Chambre> result = chambreRepository.findByBlocIdBlocAndTypeChambre(idBloc,typeC);
+        log.info("getChambresParBlocEtTypeKeyWord returned {} items", result == null ? 0 : result.size());
+        if (log.isDebugEnabled()) log.debug("getChambresParBlocEtTypeKeyWord result={}", result);
+        return result;
     }
 
     @Override
     public List<Chambre> getChambresParBlocEtTypeJPQL(long idBloc, TypeChambre typeC) {
-        return chambreRepository.findByBlocIdBlocAndTypeChambreJPQL(idBloc,typeC);
+        log.info("getChambresParBlocEtTypeJPQL called with idBloc={}, type={}", idBloc, typeC);
+        List<Chambre> result = chambreRepository.findByBlocIdBlocAndTypeChambreJPQL(idBloc,typeC);
+        log.info("getChambresParBlocEtTypeJPQL returned {} items", result == null ? 0 : result.size());
+        if (log.isDebugEnabled()) log.debug("getChambresParBlocEtTypeJPQL result={}", result);
+        return result;
     }
 
     @Override
     public List<Chambre> getChambresNonReserveParNomUniversiteEtTypeChambre(String nomUniversite, TypeChambre type) {
-        return chambreRepository.getChambresNonReserveParNomUniversiteEtTypeChambre(nomUniversite,type);
+        log.info("getChambresNonReserveParNomUniversiteEtTypeChambre called with nomUniversite={}, type={}", nomUniversite, type);
+        List<Chambre> result = chambreRepository.getChambresNonReserveParNomUniversiteEtTypeChambre(nomUniversite,type);
+        log.info("getChambresNonReserveParNomUniversiteEtTypeChambre returned {} items", result == null ? 0 : result.size());
+        if (log.isDebugEnabled()) log.debug("getChambresNonReserveParNomUniversiteEtTypeChambre result={}", result);
+        return result;
     }
 
 
     @Scheduled(cron = "*/30 * * * * * ")
     public void getChambreNonReserver(){
-        log.info(chambreRepository.getChambresNonReserve().toString());
+        try {
+            List<Chambre> nonRes = chambreRepository.getChambresNonReserve();
+            int count = nonRes == null ? 0 : nonRes.size();
+            log.info("Scheduled getChambreNonReserver found {} non-reserved chambres", count);
+            if (log.isDebugEnabled()) log.debug("Scheduled non-reserved chambres={}", nonRes);
+        } catch (Exception e) {
+            log.error("Scheduled getChambreNonReserver failed", e);
+        }
     }
 
 }
