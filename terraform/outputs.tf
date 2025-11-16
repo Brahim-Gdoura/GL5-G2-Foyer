@@ -1,16 +1,16 @@
 output "cluster_name" {
   description = "EKS Cluster Name"
-  value       = module.eks.cluster_id  # ✅ cluster_id au lieu de cluster_name
+  value       = aws_eks_cluster.main.name
 }
 
 output "cluster_endpoint" {
   description = "EKS Cluster Endpoint"
-  value       = module.eks.cluster_endpoint
+  value       = aws_eks_cluster.main.endpoint
 }
 
 output "cluster_certificate_authority_data" {
   description = "EKS Cluster CA Data"
-  value       = module.eks.cluster_certificate_authority_data
+  value       = aws_eks_cluster.main.certificate_authority[0].data
   sensitive   = true
 }
 
