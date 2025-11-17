@@ -42,7 +42,7 @@
             <version>2.1.0</version>
         </dependency>
 
-        <!-- Validation (obligatoire pour DTO + contraintes @Valid) -->
+        <!-- Validation -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
@@ -59,11 +59,11 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.30</version> <!-- ou 1.18.32 -->
+            <version>1.18.30</version>
             <scope>provided</scope>
         </dependency>
 
-        <!-- Tests -->
+        <!-- TESTS -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -83,6 +83,24 @@
         </dependency>
 
 
+        <!-- ====================================================== -->
+        <!-- 🔥 AJOUT POUR PROMETHEUS & GRAFANA (ACTUATOR + EXPORT) -->
+        <!-- ====================================================== -->
+
+        <!-- Actuator endpoints -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Export metrics to Prometheus -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- ====================================================== -->
+
     </dependencies>
 
     <build>
@@ -94,6 +112,5 @@
             </plugin>
         </plugins>
     </build>
-
 
 </project>
