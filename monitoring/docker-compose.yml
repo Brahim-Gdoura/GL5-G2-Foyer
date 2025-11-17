@@ -4,15 +4,21 @@ services:
     container_name: foyer
     ports:
       - "8080:8080"
-
+    networks:
+      - monitoring-network
 
   prometheus:
     image: prom/prometheus
     container_name: prometheus
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
       - "9090:9090"
+    networks:
+      - monitoring-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
 
   grafana:
     image: grafana/grafana
@@ -21,3 +27,11 @@ services:
       - "3000:3000"
     depends_on:
       - prometheus
+    networks:
+      - monitoring-network
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+
+networks:
+  monitoring-network:
+    driver: bridge
