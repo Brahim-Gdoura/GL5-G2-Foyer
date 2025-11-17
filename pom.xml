@@ -15,14 +15,15 @@
     <artifactId>tpFoyer-17</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>tpFoyer-17</name>
-    <description>tpFoyer-17</description>
+    <description>tpFoyer-17 avec monitoring Prometheus</description>
 
     <properties>
         <java.version>17</java.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
     </properties>
 
     <dependencies>
-
         <!-- JPA -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -63,40 +64,51 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- ========================================= -->
+        <!-- MONITORING : Actuator + Prometheus -->
+        <!-- ========================================= -->
+
+        <!-- Spring Boot Actuator - Expose endpoints -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Micrometer Prometheus - Export metrics to Prometheus -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- Micrometer Core (inclus automatiquement mais explicité pour clarté) -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+        </dependency>
+
+        <!-- ========================================= -->
         <!-- TESTS -->
+        <!-- ========================================= -->
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
             <version>5.4.0</version>
             <scope>test</scope>
         </dependency>
+
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
             <version>5.4.0</version>
             <scope>test</scope>
         </dependency>
-
-
-
-        <!-- Actuator endpoints -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
-        </dependency>
-
-        <!-- Export metrics to Prometheus -->
-        <dependency>
-            <groupId>io.micrometer</groupId>
-            <artifactId>micrometer-registry-prometheus</artifactId>
-        </dependency>
-
-
     </dependencies>
 
     <build>
@@ -105,8 +117,38 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>17</source>
+                    <target>17</target>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.30</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
             </plugin>
         </plugins>
     </build>
 
+    <distributionManagement>
+        <repository>
+            <id>deploymentRepo</id>
+            <url>http://172.25.216.144:8081/repository/maven-releases/</url>
+        </repository>
+    </distributionManagement>
 </project>
