@@ -1,11 +1,10 @@
-version: '3.8'
-
 services:
   foyer:
-    image: raniaabderrazek/foyer:latest
+    image: raniaabderrazek/foyer:35
     container_name: foyer
     ports:
       - "8080:8080"
+
 
   prometheus:
     image: prom/prometheus
