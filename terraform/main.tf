@@ -157,7 +157,7 @@ resource "aws_security_group" "eks_cluster" {
 resource "aws_eks_cluster" "main" {
   name     = "simple-eks"
   role_arn = data.aws_iam_role.lab_role.arn
-  version  = "1.31"
+  version  = "1.27"
 
   vpc_config {
     subnet_ids              = aws_subnet.private[*].id
