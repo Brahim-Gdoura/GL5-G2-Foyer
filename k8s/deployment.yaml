@@ -2,8 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: tpfoyer
-  labels:
-    app: tpfoyer
+  namespace: tpfoyer
 spec:
   replicas: 2
   selector:
@@ -14,61 +13,28 @@ spec:
       labels:
         app: tpfoyer
     spec:
-      # ✅ Attendre que MySQL soit prêt
-      initContainers:
-        - name: wait-for-mysql
-          image: busybox:1.28
-          command: ['sh', '-c', 'until nc -z mysql-service 3306; do echo waiting for mysql; sleep 2; done;']
-
       containers:
         - name: tpfoyer
           image: IMAGE_TO_REPLACE
           ports:
-            - containerPort: 8082  # ✅ Correspond à server.port
-
-          # ✅ Variables d'environnement (optionnel, sinon utilise application.properties)
+            - containerPort: 8080
           env:
             - name: SPRING_DATASOURCE_URL
-              value: "jdbc:mysql://mysql-service:3306/foyer?createDatabaseIfNotExist=true"
+              value: "jdbc:mysql://mysql-service.tpfoyer.svc.cluster.local:3306/tpfoyer"
             - name: SPRING_DATASOURCE_USERNAME
               value: "root"
             - name: SPRING_DATASOURCE_PASSWORD
               value: "root"
-
-          resources:
-            requests:
-              memory: "512Mi"
-              cpu: "250m"
-            limits:
-              memory: "1Gi"
-              cpu: "500m"
-
-          livenessProbe:
-            httpGet:
-              path: /actuator/health
-              port: 8082
-            initialDelaySeconds: 90
-            periodSeconds: 10
-
-          readinessProbe:
-            httpGet:
-              path: /actuator/health
-              port: 8082
-            initialDelaySeconds: 60
-            periodSeconds: 5
-
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: tpfoyer-service
-  labels:
-    app: tpfoyer
+  namespace: tpfoyer
 spec:
   type: LoadBalancer
   ports:
     - port: 80
-      targetPort: 8082  # ✅ Correspond à server.port
-      protocol: TCP
+      targetPort: 8080
   selector:
     app: tpfoyer
