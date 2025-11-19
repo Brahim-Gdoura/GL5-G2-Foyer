@@ -21,7 +21,6 @@ public class Chambre implements Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Setter(AccessLevel.NONE)
     long idChambre;
 
     long numeroChambre;
@@ -30,12 +29,10 @@ public class Chambre implements Serializable {
     TypeChambre typeChambre;
 
     @JsonIgnore
-    @ToString.Exclude
     @ManyToOne
     Bloc bloc;
 
     @JsonIgnore
-    @ToString.Exclude
-    @OneToMany
+    @OneToMany(mappedBy = "chambre", cascade = CascadeType.ALL)
     Set<Reservation> reservations;
 }

@@ -1,5 +1,6 @@
 package tn.esprit.tpfoyer17.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -19,14 +20,19 @@ import java.util.Set;
 public class Reservation implements Serializable {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
-    String idReservation;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    Long idReservation;
 
     Date anneeUniversitaire;
 
     boolean estValide;
 
     @ToString.Exclude
-    @ManyToMany
+    @ManyToMany(mappedBy = "reservations")
     Set<Etudiant> etudiants;
+
+    @JsonIgnore
+    @ToString.Exclude
+    @ManyToOne
+    Chambre chambre;
 }
