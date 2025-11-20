@@ -28,7 +28,12 @@ public class Reservation implements Serializable {
     boolean estValide;
 
     @ToString.Exclude
-    @ManyToMany(mappedBy = "reservations")
+    @ManyToMany
+    @JoinTable(
+            name = "reservation_etudiant",
+            joinColumns = @JoinColumn(name = "idReservation"),
+            inverseJoinColumns = @JoinColumn(name = "idEtudiant")
+    )
     Set<Etudiant> etudiants;
 
     @JsonIgnore

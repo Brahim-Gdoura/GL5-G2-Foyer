@@ -27,5 +27,6 @@ public class Universite implements Serializable {
 
     @ToString.Exclude
     @OneToOne
+    @JoinColumn(name = "foyer_id")
     Foyer foyer;
 }
