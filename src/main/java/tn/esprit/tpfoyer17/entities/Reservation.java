@@ -39,5 +39,6 @@ public class Reservation implements Serializable {
     @JsonIgnore
     @ToString.Exclude
     @ManyToOne
+    @JoinColumn(name = "chambre_id")
     Chambre chambre;
 }
