@@ -8,8 +8,8 @@ import java.util.List;
 
 public interface IReservationService {
     List<Reservation> getAllReservations();
-    Reservation getReservationById(String idReservation);
-    void deleteReservation(String idReservation);
+    Reservation getReservationById(long idReservation);
+    void deleteReservation(long idReservation);
     Reservation updateReservation(Reservation reservation);
     Reservation ajouterReservation (long idChambre, long cinEtudiant) ;
     Reservation annulerReservation (long cinEtudiant) ;

@@ -8,7 +8,7 @@ import tn.esprit.tpfoyer17.entities.Reservation;
 import java.util.List;
 
 @Repository
-public interface ReservationRepository extends CrudRepository<Reservation,String> {
+public interface ReservationRepository extends CrudRepository<Reservation,Long> {
 
     @Query("select r from Reservation r join Chambre c on r member of c.reservations where (c.bloc.idBloc = :idBloc and year(r.anneeUniversitaire) = year(current_date) and r.estValide = true) order by r.idReservation limit 1")
     Reservation findForReservation(long idBloc);

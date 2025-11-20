@@ -36,12 +36,12 @@ public class ReservationService implements IReservationService{
     }
 
     @Override
-    public Reservation getReservationById(String idReservation) {
+    public Reservation getReservationById(long idReservation) {
         return reservationRepository.findById(idReservation).get();
     }
 
     @Override
-    public void deleteReservation(String idReservation) {
+    public void deleteReservation(long idReservation) {
         reservationRepository.deleteById(idReservation);
 
     }
@@ -86,9 +86,11 @@ public class ReservationService implements IReservationService{
 
             Chambre chambre = chambreRepository.getForReservation(idChambre);
 
-            String idReservation = chambre.getIdChambre()
+            long idReservation = Long.valueOf(
+                    chambre.getIdChambre()
                     + chambre.getBloc().getNomBloc()
-                    + Calendar.getInstance().get(Calendar.YEAR);
+                    + Calendar.getInstance().get(Calendar.YEAR)
+                    );
 
             reservation.setIdReservation(idReservation);
 

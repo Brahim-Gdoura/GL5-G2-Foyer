@@ -26,12 +26,12 @@ public class ReservationController {
     }
 
     @GetMapping("get")
-    public Reservation gettingReservation(@RequestParam("idReservation") String idReservation){
+    public Reservation gettingReservation(@RequestParam("idReservation") long idReservation){
         return reservationService.getReservationById(idReservation);
     }
 
     @DeleteMapping("delete/{idReservation}")
-    public void deletingReservation(@PathVariable("idReservation") String idReservation){
+    public void deletingReservation(@PathVariable("idReservation") long idReservation){
         reservationService.deleteReservation(idReservation);
     }
 
