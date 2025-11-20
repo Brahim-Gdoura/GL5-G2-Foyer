@@ -31,14 +31,13 @@ public class Reservation implements Serializable {
     @ManyToMany
     @JoinTable(
             name = "reservation_etudiant",
-            joinColumns = @JoinColumn(name = "idReservation"),
-            inverseJoinColumns = @JoinColumn(name = "idEtudiant")
+            joinColumns = @JoinColumn(name = "reservation_id"),
+            inverseJoinColumns = @JoinColumn(name = "etudiant_id")
     )
     Set<Etudiant> etudiants;
 
     @JsonIgnore
     @ToString.Exclude
     @ManyToOne
-    @JoinColumn(name = "chambre_id")
     Chambre chambre;
 }
