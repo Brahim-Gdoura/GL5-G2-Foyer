@@ -1,5 +1,6 @@
 package tn.esprit.tpfoyer17.services;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -29,7 +30,9 @@ public class EtudiantService implements IEtudiantService{
     }
     @Override
     public Etudiant getEtudiantById(long idEtudiant) {
-        return etudiantRepository.findById(idEtudiant).get();
+
+        return etudiantRepository.findById(idEtudiant)
+                .orElseThrow(() -> new EntityNotFoundException("Bloc not found with id: " + idEtudiant));
     }
     @Override
     public void deleteEtudiant(long idEtudiant) {

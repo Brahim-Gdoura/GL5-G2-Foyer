@@ -34,5 +34,5 @@ public class Chambre implements Serializable {
 
     @JsonIgnore
     @OneToMany(mappedBy = "chambre", cascade = CascadeType.ALL)
-    Set<Reservation> reservations;
+    transient Set<Reservation> reservations;
 }

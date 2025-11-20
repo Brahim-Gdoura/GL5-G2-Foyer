@@ -1,5 +1,6 @@
 package tn.esprit.tpfoyer17.services;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -33,7 +34,9 @@ public class BlocService implements IBlocService{
     }
     @Override
     public Bloc getBlocById(long idBloc) {
-        return blocRepository.findById(idBloc).get();
+
+        return blocRepository.findById(idBloc)
+                .orElseThrow(() -> new EntityNotFoundException("Bloc not found with id: " + idBloc));
     }
     @Override
     public void deleteBloc(long idBloc) {
