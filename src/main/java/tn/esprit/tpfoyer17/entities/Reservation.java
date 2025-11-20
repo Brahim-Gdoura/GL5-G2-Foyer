@@ -34,7 +34,7 @@ public class Reservation implements Serializable {
             joinColumns = @JoinColumn(name = "reservation_id"),
             inverseJoinColumns = @JoinColumn(name = "etudiant_id")
     )
-    transient Set<Etudiant> etudiants;
+    Set<Etudiant> etudiants;
 
     @JsonIgnore
     @ToString.Exclude
