@@ -80,11 +80,6 @@
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
 
-        <!-- Micrometer Core (inclus automatiquement mais explicité pour clarté) -->
-        <dependency>
-            <groupId>io.micrometer</groupId>
-            <artifactId>micrometer-core</artifactId>
-        </dependency>
 
         <!-- ========================================= -->
         <!-- TESTS -->
