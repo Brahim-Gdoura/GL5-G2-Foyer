@@ -17,7 +17,7 @@ spec:
         - name: tpfoyer
           image: IMAGE_TO_REPLACE
           ports:
-            - containerPort: 8080
+            - containerPort: 8082
           env:
             - name: SPRING_DATASOURCE_URL
               value: "jdbc:mysql://mysql-service.tpfoyer.svc.cluster.local:3306/tpfoyer"
@@ -35,6 +35,6 @@ spec:
   type: LoadBalancer
   ports:
     - port: 80
-      targetPort: 8080
+      targetPort: 8082
   selector:
     app: tpfoyer
