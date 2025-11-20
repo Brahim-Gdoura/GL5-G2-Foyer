@@ -52,44 +52,52 @@ public class ReservationService implements IReservationService{
     }
 
     @Override
-    public Reservation ajouterReservation(long idBloc, long cinEtudiant) {
+    public Reservation ajouterReservation(long idChambre, long cinEtudiant) {
 
-        if (reservationRepository.findForReservation(idBloc) != null) {
-            Reservation reservation = reservationRepository.findForReservation(idBloc);
+        if (reservationRepository.findForReservation(idChambre) != null) {
+            Reservation reservation = reservationRepository.findForReservation(idChambre);
+
             reservation.getEtudiants().add(etudiantRepository.findByCinEtudiant(cinEtudiant));
+
             Chambre chambre = chambreRepository.findByReservationsIdReservation(reservation.getIdReservation());
+
             switch (chambre.getTypeChambre()) {
                 case TRIPLE:
-                    if (reservation.getEtudiants().size() == 3){
+                    if (reservation.getEtudiants().size() == 3)
                         reservation.setEstValide(false);
-                    }
                     break;
+
                 case DOUBLE:
                     reservation.setEstValide(false);
                     break;
             }
+
             return reservationRepository.save(reservation);
+
         } else {
-            List<Etudiant> etudiants = new ArrayList<Etudiant>();
+
+            List<Etudiant> etudiants = new ArrayList<>();
             etudiants.add(etudiantRepository.findByCinEtudiant(cinEtudiant));
-            Reservation reservation = Reservation.builder().anneeUniversitaire(new Date()).etudiants((Set<Etudiant>) etudiants).build();
-            Chambre chambre = chambreRepository.getForReservation(idBloc);
-            Bloc bloc =blocRepository.findById(idBloc).get();
-            Calendar calendar = Calendar.getInstance();
-            calendar.setTime(new Date());
-            String idReservation = chambre.getIdChambre()+bloc.getNomBloc()+calendar.get(Calendar.YEAR);
+
+            Reservation reservation = Reservation.builder()
+                    .anneeUniversitaire(new Date())
+                    .etudiants(new HashSet<>(etudiants))
+                    .build();
+
+            Chambre chambre = chambreRepository.getForReservation(idChambre);
+
+            String idReservation = chambre.getIdChambre()
+                    + chambre.getBloc().getNomBloc()
+                    + Calendar.getInstance().get(Calendar.YEAR);
+
             reservation.setIdReservation(idReservation);
-            if (chambre.getTypeChambre().equals(TypeChambre.SIMPLE)){
-                reservation.setEstValide(false);
-            }else {
-                reservation.setEstValide(true);
-            }
 
-        return reservationRepository.save(reservation);
+            reservation.setEstValide(!chambre.getTypeChambre().equals(TypeChambre.SIMPLE));
+
+            return reservationRepository.save(reservation);
         }
-
-
     }
+
 
     @Override
     public Reservation annulerReservation(long cinEtudiant) {
