@@ -21,8 +21,6 @@ pipeline {
 
     stages {
         
-        
-        
         stage('Checkout') {
             steps {
                 git credentialsId: 'github-token',
@@ -118,7 +116,6 @@ pipeline {
                 }
             }
         }
-    }
 
         stage('Deploy with Docker Compose') {
             steps {
@@ -402,9 +399,6 @@ pipeline {
                 }
             }
         }
-        
-        
-        
     }
 
     post {
