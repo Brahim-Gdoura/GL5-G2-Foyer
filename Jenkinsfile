@@ -52,7 +52,7 @@ pipeline {
             }
         }
 
-        stage('Code Coverage') {
+        /*stage('Code Coverage') {
             steps {
                 sh 'mvn verify jacoco:report'
             }
@@ -61,7 +61,7 @@ pipeline {
                     echo '✅ Rapport de couverture généré : target/site/jacoco/index.html'
                 }
             }
-        }
+        }*/
 
         stage('SonarQube Analysis') {
             steps {
