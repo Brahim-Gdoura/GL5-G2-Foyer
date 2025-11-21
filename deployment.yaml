@@ -1,0 +1,107 @@
+---
+# MySQL Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:9.4.0
+        ports:
+        - containerPort: 3306
+        env:
+        - name: MYSQL_ALLOW_EMPTY_PASSWORD
+          value: "yes"
+        - name: MYSQL_DATABASE
+          value: "tpFoyer17"
+        volumeMounts:
+        - name: mysql-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-storage
+        persistentVolumeClaim:
+          claimName: mysql-pvc
+
+---
+# MySQL Service (Internal)
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysqldb
+spec:
+  selector:
+    app: mysql
+  ports:
+  - port: 3306
+    targetPort: 3306
+  type: ClusterIP
+
+---
+# MySQL Persistent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: gp2
+
+---
+# Spring Boot Application Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tpfoyer-app
+  labels:
+    app: tpfoyer
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: tpfoyer
+  template:
+    metadata:
+      labels:
+        app: tpfoyer
+    spec:
+      containers:
+      - name: tpfoyer
+        image: seifkaroui/gl5-g2-foyer:latest
+        ports:
+        - containerPort: 8082
+        env:
+        - name: SPRING_DATASOURCE_URL
+          value: "jdbc:mysql://mysqldb:3306/tpFoyer17?createDatabaseIfNotExist=true&useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC"
+        - name: SPRING_DATASOURCE_USERNAME
+          value: "root"
+        - name: SPRING_DATASOURCE_PASSWORD
+          value: ""
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8082
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8082
+          initialDelaySeconds: 30
+          periodSeconds: 5
+

@@ -1,0 +1,15 @@
+---
+# Service for Spring Boot Application (LoadBalancer - Public Access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: tpfoyer-service
+spec:
+  selector:
+    app: tpfoyer
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8082
+  type: LoadBalancer
+
