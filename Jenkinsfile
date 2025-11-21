@@ -45,7 +45,7 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                sh 'mvn test -Dspring.profiles.active=test'
+                sh 'mvn test '
             }
             post {
                 always {
@@ -56,7 +56,7 @@ pipeline {
 
         stage('Code Coverage') {
             steps {
-                sh 'mvn verify jacoco:report -Dspring.profiles.active=test'
+                sh 'mvn verify jacoco:report'
             }
             post {
                 success {
