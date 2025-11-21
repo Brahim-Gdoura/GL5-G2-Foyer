@@ -116,21 +116,6 @@ pipeline {
                 }
             }
         }
-
-        stage('Deploy with Docker Compose') {
-            steps {
-                script {
-                    sh '''
-                        echo "🐳 Déploiement Docker Compose (demo locale)..."
-                        docker-compose down || true
-                        docker-compose up -d --build
-                        
-                        echo "✅ Docker Compose déployé"
-                        docker-compose ps
-                    '''
-                }
-            }
-        }
         
         stage('Terraform Init') {
             steps {
