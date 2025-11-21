@@ -1,4 +1,20 @@
 ---
+# MySQL Persistent Volume Claim (MUST be created first)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  labels:
+    app: mysql
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: gp2
+
+---
 # MySQL Deployment
 apiVersion: apps/v1
 kind: Deployment
@@ -18,7 +34,7 @@ spec:
     spec:
       containers:
       - name: mysql
-        image: mysql:9.4.0
+        image: mysql:8.0
         ports:
         - containerPort: 3306
         env:
@@ -32,7 +48,7 @@ spec:
             - mysqladmin
             - ping
             - -h
-            - localhost
+            - 127.0.0.1
           initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 5
@@ -43,7 +59,7 @@ spec:
             - mysqladmin
             - ping
             - -h
-            - localhost
+            - 127.0.0.1
           initialDelaySeconds: 60
           periodSeconds: 10
           timeoutSeconds: 5
@@ -69,20 +85,6 @@ spec:
   - port: 3306
     targetPort: 3306
   type: ClusterIP
-
----
-# MySQL Persistent Volume Claim
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: mysql-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
-  storageClassName: gp2
 
 ---
 # Spring Boot Application Deployment
