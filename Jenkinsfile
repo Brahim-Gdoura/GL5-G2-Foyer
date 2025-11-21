@@ -25,8 +25,8 @@ pipeline {
         
         stage('Checkout') {
             steps {
-                git credentialsId: 'github-token', 
-                    branch: 'feature/Bloc',
+                git credentialsId: 'github-token',
+                    branch: 'featureFoyer',
                     url: 'https://github.com/Brahim-Gdoura/GL5-G2-Foyer.git'
             }
         }
@@ -36,20 +36,20 @@ pipeline {
                 sh 'mvn clean compile -Dspring.profiles.active=test'
             }
         }
-        
+
         stage('Package') {
             steps {
                 sh 'mvn package -DskipTests'
             }
         }
-        
+
         stage('Run Tests') {
             steps {
                 sh 'mvn test -Dspring.profiles.active=test'
             }
             post {
                 always {
-                    junit '*/target/surefire-reports/.xml'
+                    junit 'target/surefire-reports/*.xml'
                 }
             }
         }
@@ -65,54 +65,60 @@ pipeline {
             }
         }
 
-
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh '''
+                withSonarQubeEnv('SonarServer') {
+                    sh """
                         mvn sonar:sonar \
-                        -Dsonar.projectKey=tpFoyer-17 \
-                        -Dsonar.projectName=tpFoyer-17 \
-                        -Dsonar.host.url=$SONAR_HOST_URL \
-                        -Dsonar.login=$SONAR_AUTH_TOKEN \
-                        -Dsonar.sources=src/main/java \
-                        -Dsonar.tests=src/test/java \
-                        -Dsonar.java.binaries=target/classes \
-                        -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
-                        -Dsonar.java.coveragePlugin=jacoco
-                    '''
+                            -Dsonar.projectKey=tpFoyer-17 \
+                            -Dsonar.projectName=tpFoyer-17 \
+                            -Dsonar.host.url=$SONAR_HOST_URL \
+                            -Dsonar.login=$SONAR_AUTH_TOKEN \
+                            -Dsonar.sources=src/main/java \
+                            -Dsonar.tests=src/test/java \
+                            -Dsonar.java.binaries=target/classes \
+                            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+                            -Dsonar.java.coveragePlugin=jacoco
+                    """
                 }
             }
         }
 
-        
-        
+        /* stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }*/
+
         stage('Publish To Nexus') {
             steps {
-                configFileProvider([configFile(fileId: 'd677ca6d-ace3-4447-809e-3b36d56c7434', variable: 'mavensettings')]) {
+                configFileProvider([
+                    configFile(fileId: mavenSettingsId, variable: 'mavensettings')
+                ]) {
                     sh "mvn -s $mavensettings clean deploy -DskipTests=true"
                 }
             }
         }
-        
+
         stage('Build Docker Image') {
             steps {
-                script {
-                    dockerImage = docker.build("${registry}:${IMAGE_TAG}")
-                }
+                sh "docker build -t ${registry}:latest ."
             }
         }
-        
+
         stage('Push Docker Image') {
             steps {
-                script {
-                    docker.withRegistry('', registryCredential) {
-                        dockerImage.push("${IMAGE_TAG}")
-                        dockerImage.push("latest")
-                    }
+                withCredentials([usernamePassword(credentialsId: 'dockerHub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh """
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        docker push ${registry}:latest
+                    """
                 }
             }
         }
+    }
 
         stage('Deploy with Docker Compose') {
             steps {
