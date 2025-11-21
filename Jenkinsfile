@@ -17,6 +17,7 @@ pipeline {
     }
 
     stages {
+        
         stage('Checkout') {
             steps {
                 git credentialsId: 'github-token',
@@ -65,27 +66,31 @@ pipeline {
             }
         }
         
-        // J'ai fusionné Init et Plan pour garantir la continuité
-        stage('Terraform Init & Plan') {
+        // On garde une étape de nettoyage si vous voulez, mais l'important est après
+        stage('Terraform Cleanup') {
+            steps {
+                dir("Terraform") {
+                     sh 'rm -rf .terraform .terraform.lock.hcl terraform.tfstate.backup'
+                }
+            }
+        }
+        
+        stage('Terraform Plan') {
             steps {
                 withCredentials([
                     string(credentialsId: 'aws_access_key_id', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'aws_secret_access_key', variable: 'AWS_SECRET_ACCESS_KEY'),
                     string(credentialsId: 'aws_session_token', variable: 'AWS_SESSION_TOKEN')
                 ]) {
-                    // Utilisation du dossier Terraform avec Majuscule
                     dir("Terraform") {
                         sh '''
                           export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
                           export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
                           export AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
                           export AWS_REGION=${AWS_REGION}
-        
-                          echo "🧹 Nettoyage..."
-                          rm -rf .terraform .terraform.lock.hcl terraform.tfstate.backup
                           
-                          echo "📦 Initialisation Terraform..."
-                          terraform init -upgrade -reconfigure
+                          echo "📦 Initialisation Terraform (Obligatoire avant Plan)..."
+                          terraform init -reconfigure
                           
                           echo "📋 Planification Terraform..."
                           terraform plan -var "region=${AWS_REGION}" -out=tfplan
@@ -109,17 +114,16 @@ pipeline {
                           export AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
                           export AWS_REGION=${AWS_REGION}
         
-                          echo "🔄 Vérification Init (Sécurité)..."
-                          # On refait init au cas où on change de node ou restart
+                          echo "📦 Initialisation Terraform (Obligatoire avant Apply)..."
                           terraform init -reconfigure
                           
                           echo "🚀 Création de l'infrastructure EKS..."
-                          # Si le fichier tfplan existe on l'utilise, sinon on applique directement
+                          # On vérifie si le plan existe, sinon on applique directement
                           if [ -f tfplan ]; then
-                            terraform apply -auto-approve tfplan
+                              terraform apply -auto-approve tfplan
                           else
-                            echo "⚠️ Fichier tfplan non trouvé, application directe..."
-                            terraform apply -auto-approve -var "region=${AWS_REGION}"
+                              echo "⚠️ Plan introuvable, application directe..."
+                              terraform apply -auto-approve -var "region=${AWS_REGION}"
                           fi
                           
                           echo "✅ Infrastructure créée"
@@ -132,6 +136,7 @@ pipeline {
         
         stage('🗄️ Déploiement MySQL Kubernetes') {
             steps {
+                echo '🗄️ Déploiement de MySQL dans Kubernetes...'
                 withCredentials([
                     string(credentialsId: 'aws_access_key_id', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'aws_secret_access_key', variable: 'AWS_SECRET_ACCESS_KEY'),
@@ -139,18 +144,23 @@ pipeline {
                 ]) {
                     sh '''#!/bin/bash
                         set -eu
+        
                         export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
                         export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
                         export AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
                         export AWS_REGION=us-east-1
         
+                        echo "🔧 Configuration kubectl..."
                         aws eks update-kubeconfig --name simple-eks --region ${AWS_REGION}
-                        
+        
+                        echo "🗄️ Création Namespace et MySQL..."
                         kubectl create namespace tpfoyer --dry-run=client -o yaml | kubectl apply -f -
                         kubectl apply -f mysql-deployment.yaml -n tpfoyer
-                        
-                        # Attente simplifiée
+        
+                        echo "⏳ Attente MySQL..."
                         kubectl wait --for=condition=ready pod -l app=mysql -n tpfoyer --timeout=300s || true
+                        
+                        echo "✅ MySQL déployé !"
                     '''
                 }
             }
@@ -165,6 +175,7 @@ pipeline {
                 ]) {
                     sh '''#!/bin/bash
                       set -eu
+                      
                       export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
                       export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
                       export AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
@@ -172,15 +183,22 @@ pipeline {
                       
                       aws eks update-kubeconfig --name simple-eks --region us-east-1
                       
+                      if [ ! -f deployment.yaml ]; then
+                          echo "❌ ERREUR : Fichier deployment.yaml introuvable !"
+                          exit 1
+                      fi
+                      
+                      echo "🖼️ Mise à jour de l'image : ${registry}:${IMAGE_TAG}"
                       sed -i.bak "s|IMAGE_TO_REPLACE|${registry}:${IMAGE_TAG}|g" deployment.yaml
                       
                       kubectl create namespace tpfoyer --dry-run=client -o yaml | kubectl apply -f -
                       kubectl apply -f deployment.yaml -n tpfoyer
                       kubectl apply -f service.yaml -n tpfoyer
                       
+                      echo "⏳ Attente du déploiement..."
                       kubectl rollout status deployment/tpfoyer -n tpfoyer --timeout=5m || true
                       
-                      echo "✅ Déploiement terminé"
+                      echo "✅ Déploiement terminé !"
                       kubectl get svc tpfoyer-service -n tpfoyer
                     '''
                 }
