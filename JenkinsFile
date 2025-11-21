@@ -1,0 +1,338 @@
+pipeline {
+    environment {
+        registry = "seifkaroui/gl5-g2-foyer"
+        registryCredential = 'dockerhub'
+        dockerImage = ''
+        terraformDir = 'terraform'
+        awsCredentialsId = 'aws-credentials'
+        kubeConfigCredentialId = 'kubeconfig-credentials'
+    }
+
+    agent any
+
+    stages {
+
+
+        stage('CHECKOUT GIT') {
+            steps {
+                git branch: 'feature/chambre', url: 'https://github.com/Brahim-Gdoura/GL5-G2-Foyer.git'
+            }
+        }
+
+        stage('MVN CLEAN') {
+            steps {
+                sh 'mvn clean'
+
+            }
+        }
+
+        stage('ARTIFACT CONSTRUCTION') {
+            steps {
+                echo 'ARTIFACT CONSTRUCTION...'
+                sh 'mvn package -Dmaven.test.skip=true'
+
+            }
+        }
+
+        stage('UNIT TESTS') {
+            steps {
+                echo 'launching Unit Tests...'
+                sh 'mvn test'
+
+            }
+        }
+
+        stage('MVN SONARQUBE') {
+            steps {
+                sh 'mvn sonar:sonar -Dsonar.host.url=http://sonarqube:9000 -Dsonar.login=admin -Dsonar.password=sonar'
+
+            }
+        }
+
+        stage('PUBLISH TO NEXUS') {
+            steps {
+                 withCredentials([usernamePassword(credentialsId: 'nexus', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+                     sh '''
+                 cat > settings.xml <<'EOF'
+                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+                   <servers>
+                    <server>
+                       <id>nexus</id>
+                       <username>${NEXUS_USER}</username>
+                       <password>${NEXUS_PASS}</password>
+                     </server>
+                   </servers>
+                 </settings>
+                 EOF
+                mvn deploy -DskipTests -s settings.xml
+                 '''
+                 }
+
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    dockerImage = docker.build registry + ":$BUILD_NUMBER"
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    docker.withRegistry('', registryCredential) {
+                        dockerImage.push()
+                        dockerImage.push('latest')
+                    }
+                }
+            }
+        }
+
+        stage('Clean Docker Images') {
+            steps {
+                script {
+                    sh "docker rmi $registry:$BUILD_NUMBER"
+                    sh "docker rmi $registry:latest"
+                }
+            }
+        }
+
+        stage('Test AWS Credentials') {
+            steps {
+                withCredentials([file(credentialsId: awsCredentialsId, variable: 'AWS_CREDENTIALS_FILE')]) {
+                    script {
+                        // Lecture du fichier de credentials AWS
+                        def awsCredentials = readFile(AWS_CREDENTIALS_FILE).trim().split("\n")
+
+                        // Extraction des clés d'accès et du token
+                        env.AWS_ACCESS_KEY_ID = awsCredentials.find { it.startsWith("aws_access_key_id") }.split("=")[1].trim()
+                        env.AWS_SECRET_ACCESS_KEY = awsCredentials.find { it.startsWith("aws_secret_access_key") }.split("=")[1].trim()
+                        env.AWS_SESSION_TOKEN = awsCredentials.find { it.startsWith("aws_session_token") }?.split("=")[1]?.trim()
+
+                        // Configuration des variables d'environnement AWS
+                        env.AWS_SHARED_CREDENTIALS_FILE = AWS_CREDENTIALS_FILE
+
+                        echo "AWS Access Key ID: ${env.AWS_ACCESS_KEY_ID}"
+                        echo "AWS Credentials File Loaded"
+                    }
+                }
+            }
+        }
+
+        stage('SETUP TERRAFORM') {
+            steps {
+                // Uncomment below if you need to recreate the EKS cluster
+                echo "Avant d'entrer dans le répertoire Terraform"
+                dir(terraformDir) {
+                    echo "Dans le répertoire Terraform"
+                    script {
+                        echo "AWS Access Key ID: ${env.AWS_ACCESS_KEY_ID}"
+                        sh 'terraform init'
+                        sh 'terraform validate'
+                        sh 'terraform apply -auto-approve'
+                    }
+                }
+            }
+        }
+
+        stage('UPDATE KUBECONFIG') {
+            steps {
+                script {
+                    withCredentials([file(credentialsId: awsCredentialsId, variable: 'AWS_CREDENTIALS_FILE')]) {
+                        sh 'aws eks update-kubeconfig --name mykubernetes --region us-east-1'
+                    }
+                }
+            }
+        }
+
+        stage('DEPLOY TO AWS KUBERNETES') {
+            steps {
+                script {
+                    withCredentials([file(credentialsId: awsCredentialsId, variable: 'AWS_CREDENTIALS_FILE')]) {
+                        env.KUBECONFIG = "${env.HOME}/.kube/config"
+                        sh 'aws sts get-caller-identity'
+
+                        // Deploy/Update resources (kubectl apply is idempotent)
+                        echo "=========================================="
+                        echo "🚀 DEPLOYING TO KUBERNETES"
+                        echo "=========================================="
+
+                        // Apply manifests (will create or update as needed)
+                        echo "\n📦 Applying Kubernetes manifests..."
+                        sh "kubectl apply -f deployment.yaml"
+                        sh "kubectl apply -f service.yaml"
+
+                        echo "\n📊 Current cluster status:"
+                        sh "kubectl get all"
+
+                        // Wait for MySQL
+                        echo "=========================================="
+                        echo "⏳ Waiting for MySQL to be ready..."
+                        echo "=========================================="
+
+                        def mysqlReady = waitForPodReady('mysql', 30)
+
+                        if (!mysqlReady) {
+                            echo "❌ MySQL failed to become ready"
+                            debugPod('mysql')
+                            error("MySQL deployment failed - check logs above")
+                        }
+
+                        echo "✅ MySQL is ready and healthy!"
+
+                        // Wait for application
+                        echo "=========================================="
+                        echo "⏳ Waiting for Application to be ready..."
+                        echo "=========================================="
+
+                        try {
+                            sh "kubectl rollout status deployment/tpfoyer-app --timeout=10m"
+                            echo "✅ Application deployment completed successfully!"
+                        } catch (Exception e) {
+                            echo "❌ Application deployment failed"
+                            debugPod('tpfoyer')
+                            throw e
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('GET DEPLOYMENT STATUS') {
+            steps {
+                script {
+                    withCredentials([file(credentialsId: awsCredentialsId, variable: 'AWS_CREDENTIALS_FILE')]) {
+                        echo "=========================================="
+                        echo "Checking Deployment Status..."
+                        echo "=========================================="
+
+                        sh '''
+                            echo "--- Pods Status ---"
+                            kubectl get pods -l app=tpfoyer -o wide
+
+                            echo "\n--- Service Status ---"
+                            kubectl get service tpfoyer-service
+
+                            echo "\n--- Waiting for Load Balancer (max 3 minutes)..."
+                            for i in {1..18}; do
+                                EXTERNAL_IP=$(kubectl get service tpfoyer-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+                                if [ ! -z "$EXTERNAL_IP" ]; then
+                                    echo "=========================================="
+                                    echo "✅ Application deployed successfully!"
+                                    echo "=========================================="
+                                    echo "Swagger UI URL:"
+                                    echo "http://$EXTERNAL_IP/tpFoyer17/swagger-ui/index.html#/"
+                                    echo ""
+                                    echo "API Base URL:"
+                                    echo "http://$EXTERNAL_IP/tpFoyer17"
+                                    echo ""
+                                    echo "Health Check:"
+                                    echo "http://$EXTERNAL_IP/tpFoyer17/actuator/health"
+                                    echo "=========================================="
+                                    break
+                                fi
+                                echo "Waiting for Load Balancer... ($i/18)"
+                                sleep 10
+                            done
+
+                            echo "\n--- Recent Pod Logs ---"
+                            POD_NAME=$(kubectl get pods -l app=tpfoyer -o jsonpath='{.items[0].metadata.name}')
+                            if [ ! -z "$POD_NAME" ]; then
+                                echo "Logs from pod: $POD_NAME"
+                                kubectl logs $POD_NAME --tail=50
+                            fi
+                        '''
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+/**
+ * Wait for a pod to become ready
+ * @param appLabel - The app label selector (e.g., 'mysql', 'tpfoyer')
+ * @param maxAttempts - Maximum number of attempts
+ * @return true if pod is ready, false otherwise
+ */
+def waitForPodReady(String appLabel, int maxAttempts = 15) {
+    def ready = false
+    def attempts = 0
+
+    while (!ready && attempts < maxAttempts) {
+        attempts++
+        try {
+            def podName = sh(
+                script: "kubectl get pods -l app=${appLabel} -o jsonpath='{.items[0].metadata.name}'",
+                returnStdout: true
+            ).trim()
+
+            if (podName) {
+                def podStatus = sh(
+                    script: "kubectl get pod ${podName} -o jsonpath='{.status.phase}'",
+                    returnStdout: true
+                ).trim()
+
+                def readyStatus = sh(
+                    script: "kubectl get pod ${podName} -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}'",
+                    returnStdout: true
+                ).trim()
+
+                echo "  [${attempts}/${maxAttempts}] Pod: ${podName} | Phase: ${podStatus} | Ready: ${readyStatus}"
+
+                if (readyStatus == "True") {
+                    ready = true
+                } else {
+                    sleep 10
+                }
+            } else {
+                echo "  [${attempts}/${maxAttempts}] Waiting for ${appLabel} pod to be created..."
+                sleep 10
+            }
+        } catch (Exception e) {
+            echo "  [${attempts}/${maxAttempts}] Error: ${e.message}"
+            sleep 10
+        }
+    }
+
+    return ready
+}
+
+/**
+ * Debug pod issues by collecting diagnostic information
+ * @param appLabel - The app label selector
+ */
+def debugPod(String appLabel) {
+    echo "\n🔍 Debugging ${appLabel} pod..."
+
+    try {
+        echo "\n--- Pod Status ---"
+        sh "kubectl get pods -l app=${appLabel} || true"
+
+        echo "\n--- Pod Description ---"
+        sh "kubectl describe pod -l app=${appLabel} || true"
+
+        def podName = sh(
+            script: "kubectl get pods -l app=${appLabel} -o jsonpath='{.items[0].metadata.name}'",
+            returnStdout: true
+        ).trim()
+
+        if (podName) {
+            echo "\n--- Pod Logs ---"
+            sh "kubectl logs ${podName} --tail=100 || echo 'No logs available'"
+
+            echo "\n--- Pod Events ---"
+            sh "kubectl get events --field-selector involvedObject.name=${podName} --sort-by='.lastTimestamp' || true"
+        }
+    } catch (Exception e) {
+        echo "Failed to gather debug info: ${e.message}"
+    }
+}
