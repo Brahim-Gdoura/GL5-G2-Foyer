@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
+
+import io.swagger.v3.oas.annotations.tags.Tag;
 import tn.esprit.tpfoyer17.entities.Foyer;
 import tn.esprit.tpfoyer17.services.IFoyerService;
 
@@ -15,6 +17,7 @@ import java.util.List;
 @Slf4j
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @RequestMapping("api/foyers")
+@Tag(name = "Gestion des foyers",description = "les apis pour gérer tout les foyers")
 public class FoyerController {
     IFoyerService foyerService;
 
