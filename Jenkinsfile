@@ -124,7 +124,7 @@ pipeline {
                     string(credentialsId: 'aws_secret_access_key', variable: 'AWS_SECRET_ACCESS_KEY'),
                     string(credentialsId: 'aws_session_token', variable: 'AWS_SESSION_TOKEN')
                 ]) {
-                    dir("terraform") {
+                    dir("Terraform") {
                         sh '''
                           export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
                           export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
@@ -132,7 +132,7 @@ pipeline {
                           export AWS_REGION=${AWS_REGION}
         
                           echo "🧹 Nettoyage Terraform..."
-                          rm -rf .terraform .terraform.lock.hcl terraform.tfstate.backup
+                          rm -rf .Terraform .Terraform.lock.hcl Terraform.tfstate.backup
                           
                           echo "📦 Initialisation Terraform..."
                           terraform init -upgrade -reconfigure
