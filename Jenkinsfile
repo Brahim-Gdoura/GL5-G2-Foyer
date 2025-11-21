@@ -21,48 +21,6 @@ pipeline {
 
     stages {
         
-        stage('Install Dependencies') {
-            steps {
-                script {
-                    sh '''#!/bin/bash
-                        # Vérifier si Terraform est déjà installé
-                        if ! command -v terraform &> /dev/null; then
-                            echo "📦 Installation de Terraform..."
-                            cd /tmp
-                            wget -q https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_linux_amd64.zip
-                            unzip -q terraform_1.9.8_linux_amd64.zip
-                            mv terraform /usr/local/bin/
-                            rm terraform_1.9.8_linux_amd64.zip
-                            chmod +x /usr/local/bin/terraform
-                        fi
-                        
-                        # Vérifier si AWS CLI est installé
-                        if ! command -v aws &> /dev/null; then
-                            echo "📦 Installation de AWS CLI..."
-                            cd /tmp
-                            curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-                            unzip -q awscliv2.zip
-                            ./aws/install
-                            rm -rf aws awscliv2.zip
-                        fi
-                        
-                        # Vérifier si kubectl est installé
-                        if ! command -v kubectl &> /dev/null; then
-                            echo "📦 Installation de kubectl..."
-                            curl -LO "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl"
-                            chmod +x kubectl
-                            mv kubectl /usr/local/bin/
-                        fi
-                        
-                        echo "✅ Vérification des installations:"
-                        terraform --version
-                        aws --version
-                        kubectl version --client
-                    '''
-                }
-            }
-        }
-        
         stage('Checkout') {
             steps {
                 git credentialsId: 'github-token',
