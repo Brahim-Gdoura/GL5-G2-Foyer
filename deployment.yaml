@@ -80,6 +80,10 @@ spec:
       labels:
         app: tpfoyer
     spec:
+      initContainers:
+      - name: wait-for-mysql
+        image: busybox:1.36
+        command: ['sh', '-c', 'until nc -z mysqldb 3306; do echo waiting for mysql; sleep 2; done;']
       containers:
       - name: tpfoyer
         image: seifkaroui/gl5-g2-foyer:latest
@@ -92,19 +96,23 @@ spec:
           value: "root"
         - name: SPRING_DATASOURCE_PASSWORD
           value: ""
+        - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+          value: "update"
+        - name: SPRING_JPA_DATABASE_PLATFORM
+          value: "org.hibernate.dialect.MySQL8Dialect"
         livenessProbe:
           httpGet:
             path: /tpFoyer17/actuator/health
             port: 8082
-          initialDelaySeconds: 90
+          initialDelaySeconds: 120
           periodSeconds: 10
           timeoutSeconds: 5
-          failureThreshold: 3
+          failureThreshold: 5
         readinessProbe:
           httpGet:
             path: /tpFoyer17/actuator/health
             port: 8082
-          initialDelaySeconds: 60
+          initialDelaySeconds: 90
           periodSeconds: 5
           timeoutSeconds: 5
           failureThreshold: 3
