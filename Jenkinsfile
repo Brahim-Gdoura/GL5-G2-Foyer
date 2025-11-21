@@ -63,7 +63,7 @@ pipeline {
             }
         }*/
 
-        stage('SonarQube Analysis') {
+       /*stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarServer') {
                     sh """
@@ -80,7 +80,7 @@ pipeline {
                     """
                 }
             }
-        }
+        }*/
 
         /* stage('Quality Gate') {
             steps {
@@ -90,7 +90,7 @@ pipeline {
             }
         }*/
 
-        stage('Publish To Nexus') {
+        /*stage('Publish To Nexus') {
             steps {
                 configFileProvider([
                     configFile(fileId: mavenSettingsId, variable: 'mavensettings')
@@ -98,7 +98,7 @@ pipeline {
                     sh "mvn -s $mavensettings clean deploy -DskipTests=true"
                 }
             }
-        }
+        }*/
 
         stage('Build Docker Image') {
             steps {
