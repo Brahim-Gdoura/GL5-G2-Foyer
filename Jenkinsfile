@@ -48,6 +48,53 @@ pipeline {
                 }
             }
         }
+        /*stage('Code Coverage') {
+            steps {
+                sh 'mvn verify jacoco:report'
+            }
+            post {
+                success {
+                    echo '✅ Rapport de couverture généré : target/site/jacoco/index.html'
+                }
+            }
+        }*/
+
+       /*stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarServer') {
+                    sh """
+                        mvn sonar:sonar \
+                            -Dsonar.projectKey=tpFoyer-17 \
+                            -Dsonar.projectName=tpFoyer-17 \
+                            -Dsonar.host.url=$SONAR_HOST_URL \
+                            -Dsonar.login=$SONAR_AUTH_TOKEN \
+                            -Dsonar.sources=src/main/java \
+                            -Dsonar.tests=src/test/java \
+                            -Dsonar.java.binaries=target/classes \
+                            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+                            -Dsonar.java.coveragePlugin=jacoco
+                    """
+                }
+            }
+        }*/
+
+        /* stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }*/
+
+        /*stage('Publish To Nexus') {
+            steps {
+                configFileProvider([
+                    configFile(fileId: mavenSettingsId, variable: 'mavensettings')
+                ]) {
+                    sh "mvn -s $mavensettings clean deploy -DskipTests=true"
+                }
+            }
+        }*/
 
         stage('Build Docker Image') {
             steps {
@@ -191,21 +238,30 @@ pipeline {
                       echo "🖼️ Mise à jour de l'image : ${registry}:${IMAGE_TAG}"
                       sed -i.bak "s|IMAGE_TO_REPLACE|${registry}:${IMAGE_TAG}|g" deployment.yaml
                       
+                      echo "🚀 Application des manifestes..."
                       kubectl create namespace tpfoyer --dry-run=client -o yaml | kubectl apply -f -
                       kubectl apply -f deployment.yaml -n tpfoyer
                       kubectl apply -f service.yaml -n tpfoyer
                       
-                      echo "⏳ Attente du déploiement..."
-                      kubectl rollout status deployment/tpfoyer -n tpfoyer --timeout=5m || true
+                      echo "⏳ Attente du déploiement (Nom corrigé : my-spring-boot-app)..."
+                      # 👇 CORRECTION ICI : Utilisation du nom réel 'my-spring-boot-app'
+                      kubectl rollout status deployment/my-spring-boot-app -n tpfoyer --timeout=5m || {
+                          echo "⚠️ Echec du rollout ou timeout"
+                          kubectl describe deployment my-spring-boot-app -n tpfoyer
+                          kubectl logs -l app=my-spring-boot-app -n tpfoyer --tail=50
+                          exit 1
+                      }
                       
                       echo "✅ Déploiement terminé !"
-                      kubectl get svc tpfoyer-service -n tpfoyer
+                      # 👇 CORRECTION ICI : Utilisation du nom réel 'my-spring-boot-service'
+                      kubectl get svc my-spring-boot-service -n tpfoyer
+                      
+                      echo "🔗 URL (LoadBalancer) :"
+                      kubectl get svc my-spring-boot-service -n tpfoyer -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || echo "En cours de création..."
                     '''
                 }
             }
         }
-    }
-
     post {
         always {
             archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
