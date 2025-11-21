@@ -1,19 +1,4 @@
 ---
-# MySQL Persistent Volume Claim (MUST be created first)
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: mysql-pvc
-  labels:
-    app: mysql
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
-
----
 # MySQL Deployment
 apiVersion: apps/v1
 kind: Deployment
@@ -68,8 +53,7 @@ spec:
           mountPath: /var/lib/mysql
       volumes:
       - name: mysql-storage
-        persistentVolumeClaim:
-          claimName: mysql-pvc
+        emptyDir: {}
 
 ---
 # MySQL Service (Internal)
