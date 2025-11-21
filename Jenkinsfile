@@ -49,52 +49,53 @@ pipeline {
             }
         }
         /*stage('Code Coverage') {
-            steps {
-                sh 'mvn verify jacoco:report'
+        steps {
+            sh 'mvn verify jacoco:report'
+        }
+        post {
+            success {
+                echo '✅ Rapport de couverture généré : target/site/jacoco/index.html'
             }
-            post {
-                success {
-                    echo '✅ Rapport de couverture généré : target/site/jacoco/index.html'
-                }
-            }
-        }*/
+        }
+    }*/
 
-       /*stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('SonarServer') {
-                    sh """
-                        mvn sonar:sonar \
-                            -Dsonar.projectKey=tpFoyer-17 \
-                            -Dsonar.projectName=tpFoyer-17 \
-                            -Dsonar.host.url=$SONAR_HOST_URL \
-                            -Dsonar.login=$SONAR_AUTH_TOKEN \
-                            -Dsonar.sources=src/main/java \
-                            -Dsonar.tests=src/test/java \
-                            -Dsonar.java.binaries=target/classes \
-                            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
-                            -Dsonar.java.coveragePlugin=jacoco
-                    """
-                }
+   /*stage('SonarQube Analysis') {
+        steps {
+            withSonarQubeEnv('SonarServer') {
+                sh """
+                    mvn sonar:sonar \
+                        -Dsonar.projectKey=tpFoyer-17 \
+                        -Dsonar.projectName=tpFoyer-17 \
+                        -Dsonar.host.url=$SONAR_HOST_URL \
+                        -Dsonar.login=$SONAR_AUTH_TOKEN \
+                        -Dsonar.sources=src/main/java \
+                        -Dsonar.tests=src/test/java \
+                        -Dsonar.java.binaries=target/classes \
+                        -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+                        -Dsonar.java.coveragePlugin=jacoco
+                """
             }
-        }*/
+        }
+    }*/
 
-        /* stage('Quality Gate') {
-            steps {
-                timeout(time: 5, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
+    /* stage('Quality Gate') {
+        steps {
+            timeout(time: 5, unit: 'MINUTES') {
+                waitForQualityGate abortPipeline: true
             }
-        }*/
+        }
+    }*/
 
-        /*stage('Publish To Nexus') {
-            steps {
-                configFileProvider([
-                    configFile(fileId: mavenSettingsId, variable: 'mavensettings')
-                ]) {
-                    sh "mvn -s $mavensettings clean deploy -DskipTests=true"
-                }
+    /*stage('Publish To Nexus') {
+        steps {
+            configFileProvider([
+                configFile(fileId: mavenSettingsId, variable: 'mavensettings')
+            ]) {
+                sh "mvn -s $mavensettings clean deploy -DskipTests=true"
             }
-        }*/
+        }
+    }*/
+
 
         stage('Build Docker Image') {
             steps {
@@ -113,7 +114,6 @@ pipeline {
             }
         }
         
-        // On garde une étape de nettoyage si vous voulez, mais l'important est après
         stage('Terraform Cleanup') {
             steps {
                 dir("Terraform") {
@@ -136,7 +136,7 @@ pipeline {
                           export AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
                           export AWS_REGION=${AWS_REGION}
                           
-                          echo "📦 Initialisation Terraform (Obligatoire avant Plan)..."
+                          echo "📦 Initialisation Terraform..."
                           terraform init -reconfigure
                           
                           echo "📋 Planification Terraform..."
@@ -161,11 +161,10 @@ pipeline {
                           export AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
                           export AWS_REGION=${AWS_REGION}
         
-                          echo "📦 Initialisation Terraform (Obligatoire avant Apply)..."
+                          echo "📦 Initialisation Terraform..."
                           terraform init -reconfigure
                           
                           echo "🚀 Création de l'infrastructure EKS..."
-                          # On vérifie si le plan existe, sinon on applique directement
                           if [ -f tfplan ]; then
                               terraform apply -auto-approve tfplan
                           else
@@ -183,7 +182,6 @@ pipeline {
         
         stage('🗄️ Déploiement MySQL Kubernetes') {
             steps {
-                echo '🗄️ Déploiement de MySQL dans Kubernetes...'
                 withCredentials([
                     string(credentialsId: 'aws_access_key_id', variable: 'AWS_ACCESS_KEY_ID'),
                     string(credentialsId: 'aws_secret_access_key', variable: 'AWS_SECRET_ACCESS_KEY'),
@@ -191,7 +189,6 @@ pipeline {
                 ]) {
                     sh '''#!/bin/bash
                         set -eu
-        
                         export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
                         export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
                         export AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
@@ -243,8 +240,7 @@ pipeline {
                       kubectl apply -f deployment.yaml -n tpfoyer
                       kubectl apply -f service.yaml -n tpfoyer
                       
-                      echo "⏳ Attente du déploiement (Nom corrigé : my-spring-boot-app)..."
-                      # 👇 CORRECTION ICI : Utilisation du nom réel 'my-spring-boot-app'
+                      echo "⏳ Attente du déploiement..."
                       kubectl rollout status deployment/my-spring-boot-app -n tpfoyer --timeout=5m || {
                           echo "⚠️ Echec du rollout ou timeout"
                           kubectl describe deployment my-spring-boot-app -n tpfoyer
@@ -253,7 +249,6 @@ pipeline {
                       }
                       
                       echo "✅ Déploiement terminé !"
-                      # 👇 CORRECTION ICI : Utilisation du nom réel 'my-spring-boot-service'
                       kubectl get svc my-spring-boot-service -n tpfoyer
                       
                       echo "🔗 URL (LoadBalancer) :"
@@ -262,6 +257,8 @@ pipeline {
                 }
             }
         }
+    } // 👈 C'est cette accolade qui manquait pour fermer 'stages' avant 'post'
+
     post {
         always {
             archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
