@@ -124,6 +124,7 @@ pipeline {
                     string(credentialsId: 'aws_secret_access_key', variable: 'AWS_SECRET_ACCESS_KEY'),
                     string(credentialsId: 'aws_session_token', variable: 'AWS_SESSION_TOKEN')
                 ]) {
+                    // 👇 CHANGEMENT ICI : Dossier avec majuscule
                     dir("Terraform") {
                         sh '''
                           export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
@@ -132,7 +133,8 @@ pipeline {
                           export AWS_REGION=${AWS_REGION}
         
                           echo "🧹 Nettoyage Terraform..."
-                          rm -rf .Terraform .Terraform.lock.hcl Terraform.tfstate.backup
+                          # Note: Terraform génère toujours .terraform en minuscule, même si le dossier parent a une majuscule.
+                          rm -rf .terraform .terraform.lock.hcl terraform.tfstate.backup
                           
                           echo "📦 Initialisation Terraform..."
                           terraform init -upgrade -reconfigure
@@ -151,6 +153,7 @@ pipeline {
                     string(credentialsId: 'aws_secret_access_key', variable: 'AWS_SECRET_ACCESS_KEY'),
                     string(credentialsId: 'aws_session_token', variable: 'AWS_SESSION_TOKEN')
                 ]) {
+                    // 👇 CHANGEMENT ICI : Dossier avec majuscule pour trouver le .terraform créé avant
                     dir("Terraform") {
                         sh '''
                           export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
@@ -173,6 +176,7 @@ pipeline {
                     string(credentialsId: 'aws_secret_access_key', variable: 'AWS_SECRET_ACCESS_KEY'),
                     string(credentialsId: 'aws_session_token', variable: 'AWS_SESSION_TOKEN')
                 ]) {
+                    // 👇 CHANGEMENT ICI : Dossier avec majuscule
                     dir("Terraform") {
                         sh '''
                           export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
@@ -413,12 +417,4 @@ pipeline {
             ========================================
             ❌ PIPELINE ÉCHOUÉ !
             ========================================
-            Vérifiez les logs ci-dessus pour identifier l'erreur.
-            ========================================
-            '''
-        }
-        cleanup {
-            cleanWs()
-        }
-    }
-}
+            Vérifiez les logs ci-dessus
