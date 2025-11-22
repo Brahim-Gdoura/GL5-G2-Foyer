@@ -11,6 +11,24 @@ provider "aws" {
   region = var.aws_region
 }
 
+# Create EC2 key pair
+resource "tls_private_key" "jenkins_key" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+resource "aws_key_pair" "jenkins_key" {
+  key_name   = "jenkins-auto-key"
+  public_key = tls_private_key.jenkins_key.public_key_openssh
+}
+
+# Save private key to file (on Terraform host, will use Jenkins workspace later)
+output "jenkins_private_key_pem" {
+  description = "Private key for SSH access to EC2"
+  value       = tls_private_key.jenkins_key.private_key_pem
+  sensitive   = true
+}
+
 # VPC
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
