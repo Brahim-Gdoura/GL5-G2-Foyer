@@ -152,3 +152,47 @@ spec:
       targetPort: 8083
       nodePort: 30083
   type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: foyer-frontend
+  namespace: foyer-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: foyer-frontend
+  template:
+    metadata:
+      labels:
+        app: foyer-frontend
+    spec:
+      containers:
+        - name: foyer-frontend
+          image: ahmadtayh/foyer-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: '128Mi'
+              cpu: '100m'
+            limits:
+              memory: '256Mi'
+              cpu: '200m'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: foyer-frontend
+  namespace: foyer-app
+spec:
+  selector:
+    app: foyer-frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+      nodePort: 30080
+  type: NodePort
