@@ -27,3 +27,14 @@ output "kubeconfig_command" {
   description = "Command to get kubeconfig"
   value       = "ssh -i ${var.key_pair_name}.pem ubuntu@${aws_instance.k3s_master.public_ip} 'cat ~/.kube/config'"
 }
+
+output "private_key_path" {
+  description = "Path to the private SSH key"
+  value       = "${path.module}/my-key-pair.pem"
+}
+
+output "ssh_private_key" {
+  description = "Private SSH key (sensitive - use carefully)"
+  value       = tls_private_key.ssh_key.private_key_pem
+  sensitive   = true
+}
