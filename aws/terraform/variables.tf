@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "project_name" {
   description = "Project name for resource tagging"
   type        = string
-  default     = "k3s-foyer-app"
+  default     = "k3s-universite-app"
 }
 
 variable "instance_type" {

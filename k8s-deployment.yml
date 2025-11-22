@@ -76,6 +76,20 @@ spec:
       targetPort: 3306
   type: ClusterIP
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysqldb
+  namespace: foyer-app
+spec:
+  selector:
+    app: mysql
+  ports:
+    - protocol: TCP
+      port: 3306
+      targetPort: 3306
+  type: ClusterIP
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -93,13 +107,13 @@ spec:
     spec:
       containers:
         - name: foyer-app
-          image: foyer-app:latest
-          imagePullPolicy: IfNotPresent
+          image: ahmadtayh/foyer-app:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8083
           env:
             - name: SPRING_DATASOURCE_URL
-              value: jdbc:mysql://mysql:3306/tpFoyer17?createDatabaseIfNotExist=true&useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC
+              value: jdbc:mysql://mysqldb:3306/tpFoyer17?createDatabaseIfNotExist=true&useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC
             - name: SPRING_DATASOURCE_USERNAME
               value: root
             - name: SPRING_DATASOURCE_PASSWORD

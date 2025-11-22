@@ -3,7 +3,7 @@ pipeline {
     
     environment {
         AWS_REGION = 'us-east-1'
-        PROJECT_NAME = 'k3s-foyer-app'
+        PROJECT_NAME = 'k3s-universite-app'
         TERRAFORM_DIR = 'aws/terraform'
     }
     
