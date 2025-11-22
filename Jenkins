@@ -52,18 +52,37 @@ pipeline {
         }
 
         // ------------------- Real Docker Push -------------------
-        stage('Docker Push') {
+stage('Docker Push') {
+    steps {
+        withCredentials([string(credentialsId: 'dockerhub-credentials', variable: 'DOCKER_TOKEN')]) {
+            sh """
+                echo "=== Logging in to Docker Hub ==="
+                echo \$DOCKER_TOKEN | docker login -u mohamedaminelili02 --password-stdin
+                echo "=== Pushing Docker Image ==="
+                docker push ${DOCKER_IMAGE}
+                echo "=== Docker Push Completed ==="
+                docker logout
+            """
+        }
+    }
+}
+
+ stage('Terraform Init') {
             steps {
-                withDockerRegistry([credentialsId: 'docker-credentials', url: '']) {
-                    sh '''
-                        echo "=== Pushing Docker Image ==="
-                        docker push ${DOCKER_IMAGE}
-                        echo "=== Docker Push Completed ==="
-                    '''
+                dir(env.TERRAFORM_DIR) {
+                    withCredentials([
+                        string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
+                        string(credentialsId: 'AWS_SESSION_TOKEN', variable: 'AWS_SESSION_TOKEN')
+                    ]) {
+                        sh '''
+                            echo "=== Initializing Terraform ==="
+                            terraform init -upgrade
+                        '''
+                    }
                 }
             }
         }
-
         // ------------------- Terraform Stages -------------------
         stage('Validate Terraform Syntax') {
             steps {
@@ -84,22 +103,7 @@ pipeline {
             }
         }
 
-        stage('Terraform Init') {
-            steps {
-                dir(env.TERRAFORM_DIR) {
-                    withCredentials([
-                        string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                        string(credentialsId: 'AWS_SESSION_TOKEN', variable: 'AWS_SESSION_TOKEN')
-                    ]) {
-                        sh '''
-                            echo "=== Initializing Terraform ==="
-                            terraform init -upgrade
-                        '''
-                    }
-                }
-            }
-        }
+
 
         stage('Terraform Plan') {
             steps {
@@ -156,23 +160,7 @@ pipeline {
             }
         }
 
-        stage('Terraform Destroy') {
-            steps {
-                dir(env.TERRAFORM_DIR) {
-                    withCredentials([
-                        string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                        string(credentialsId: 'AWS_SESSION_TOKEN', variable: 'AWS_SESSION_TOKEN')
-                    ]) {
-                        sh '''
-                            echo "=== Destroying Terraform Resources ==="
-                            terraform destroy -auto-approve
-                            echo "=== Terraform Destroy Completed ==="
-                        '''
-                    }
-                }
-            }
-        }
+
     }
 
     post {
