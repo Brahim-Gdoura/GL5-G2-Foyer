@@ -8,11 +8,7 @@ pipeline {
     }
 
     stages {
-    stage('Cleanup') {
-        steps {
-            deleteDir()
-        }
-    }
+
         stage('Maven Build') {
             steps {
                 sh '''
