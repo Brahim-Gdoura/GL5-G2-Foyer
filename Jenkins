@@ -5,6 +5,7 @@ pipeline {
         AWS_REGION = 'us-east-1'
         PROJECT_NAME = 'k3s-nginx-jenkins'
         TERRAFORM_DIR = 'awstest/terraform'
+        DOCKER_IMAGE = 'mohamedaminelili02/my-app:latest'
     }
 
     stages {
@@ -39,33 +40,27 @@ pipeline {
             }
         }
 
-        // ------------------- Mock Docker Build -------------------
+        // ------------------- Real Docker Build -------------------
         stage('Docker Build') {
             steps {
                 sh '''
-                    echo "=== Mocking Docker Build ==="
-                    # Random wait between 100ms and 300ms
-                    WAIT_MS=$((RANDOM % 201 + 100))
-                    echo "Waiting for ${WAIT_MS}ms to simulate Docker build"
-                    sleep_time=$(echo "scale=3; ${WAIT_MS}/1000" | awk '{printf "%.3f", $1}')
-                    sleep $sleep_time
-                    echo "=== Mock Docker Build Completed ==="
+                    echo "=== Building Docker Image ==="
+                    docker build -t ${DOCKER_IMAGE} .
+                    echo "=== Docker Build Completed ==="
                 '''
             }
         }
 
-        // ------------------- Mock Docker Deploy -------------------
+        // ------------------- Real Docker Push -------------------
         stage('Docker Push') {
             steps {
-                sh '''
-                    echo "=== Mocking Docker Deploy ==="
-                    # Random wait between 100ms and 300ms
-                    WAIT_MS=$((RANDOM % 201 + 100))
-                    echo "Waiting for ${WAIT_MS}ms to simulate Docker deploy"
-                    sleep_time=$(echo "scale=3; ${WAIT_MS}/1000" | awk '{printf "%.3f", $1}')
-                    sleep $sleep_time
-                    echo "=== Mock Docker Deploy Completed ==="
-                '''
+                withDockerRegistry([credentialsId: 'docker-credentials', url: '']) {
+                    sh '''
+                        echo "=== Pushing Docker Image ==="
+                        docker push ${DOCKER_IMAGE}
+                        echo "=== Docker Push Completed ==="
+                    '''
+                }
             }
         }
 
@@ -161,7 +156,6 @@ pipeline {
             }
         }
 
-        // ------------------- Terraform Destroy -------------------
         stage('Terraform Destroy') {
             steps {
                 dir(env.TERRAFORM_DIR) {
