@@ -6,121 +6,37 @@ pipeline {
         PROJECT_NAME = 'k3s-nginx-jenkins'
         TERRAFORM_DIR = 'awstest/terraform'
         DOCKER_IMAGE = 'mohamedaminelili02/my-app:latest'
+        SSH_CREDENTIALS_ID = 'jenkins-ec2-key' // SSH private key credential in Jenkins
     }
 
     stages {
 
-        stage('Maven Build') {
+        stage('Maven Build & Package') {
             steps {
                 sh '''
-                    echo "=== Building with Maven ==="
-                    mvn clean compile
-                    echo "=== Maven build completed ==="
+                    echo "=== Maven Build ==="
+                    mvn clean compile package -DskipTests
                 '''
             }
         }
 
-        stage('Maven Package') {
+        stage('Run Maven Tests') {
             steps {
-                sh '''
-                    echo "=== Packaging with Maven ==="
-                    mvn clean package -DskipTests
-                    echo "=== Maven packaging completed ==="
-                '''
+                sh 'mvn test'
             }
         }
 
-        stage('Maven Tests') {
+        stage('Docker Build & Push') {
             steps {
-                sh '''
-                    echo "=== Running Maven Tests ==="
-                    mvn test
-                    echo "=== Maven tests completed ==="
-                '''
-            }
-        }
-
-        // ------------------- Real Docker Build -------------------
-        stage('Docker Build') {
-            steps {
-                sh '''
-                    echo "=== Building Docker Image ==="
-                    docker build -t ${DOCKER_IMAGE} .
-                    echo "=== Docker Build Completed ==="
-                '''
-            }
-        }
-
-        // ------------------- Real Docker Push -------------------
-stage('Docker Push') {
-    steps {
-        withCredentials([string(credentialsId: 'dockerhub-credentials', variable: 'DOCKER_TOKEN')]) {
-            sh """
-                echo "=== Logging in to Docker Hub ==="
-                echo \$DOCKER_TOKEN | docker login -u mohamedaminelili02 --password-stdin
-                echo "=== Pushing Docker Image ==="
-                docker push ${DOCKER_IMAGE}
-                echo "=== Docker Push Completed ==="
-                docker logout
-            """
-        }
-    }
-}
-
- stage('Terraform Init') {
-            steps {
-                dir(env.TERRAFORM_DIR) {
-                    withCredentials([
-                        string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                        string(credentialsId: 'AWS_SESSION_TOKEN', variable: 'AWS_SESSION_TOKEN')
-                    ]) {
-                        sh '''
-                            echo "=== Initializing Terraform ==="
-                            terraform init -upgrade
-                        '''
-                    }
-                }
-            }
-        }
-        // ------------------- Terraform Stages -------------------
-        stage('Validate Terraform Syntax') {
-            steps {
-                dir(env.TERRAFORM_DIR) {
-                    withCredentials([
-                        string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                        string(credentialsId: 'AWS_SESSION_TOKEN', variable: 'AWS_SESSION_TOKEN')
-                    ]) {
-                        sh '''
-                            echo "=== Validating Terraform syntax ==="
-                            terraform validate
-                            terraform fmt -check
-                            echo "=== Syntax validation passed ==="
-                        '''
-                    }
-                }
-            }
-        }
-
-
-
-        stage('Terraform Plan') {
-            steps {
-                dir(env.TERRAFORM_DIR) {
-                    withCredentials([
-                        string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                        string(credentialsId: 'AWS_SESSION_TOKEN', variable: 'AWS_SESSION_TOKEN')
-                    ]) {
-                        sh '''
-                            terraform plan -var="aws_region=${AWS_REGION}" \
-                                          -var="project_name=${PROJECT_NAME}" \
-                                          -var="app_name=my-app" \
-                                          -var="app_port=8082" \
-                                          -out=tfplan
-                        '''
-                    }
+                withCredentials([string(credentialsId: 'dockerhub-credentials', variable: 'DOCKER_TOKEN')]) {
+                    sh """
+                        echo "=== Docker Build ==="
+                        docker build -t ${DOCKER_IMAGE} .
+                        echo "=== Docker Login ==="
+                        echo \$DOCKER_TOKEN | docker login -u mohamedaminelili02 --password-stdin
+                        docker push ${DOCKER_IMAGE}
+                        docker logout
+                    """
                 }
             }
         }
@@ -134,58 +50,66 @@ stage('Docker Push') {
                         string(credentialsId: 'AWS_SESSION_TOKEN', variable: 'AWS_SESSION_TOKEN')
                     ]) {
                         sh '''
+                            terraform init -upgrade
+                            terraform plan -var="aws_region=${AWS_REGION}" -var="project_name=${PROJECT_NAME}" -out=tfplan
                             terraform apply -auto-approve tfplan
-                            sleep 30
                         '''
                     }
                 }
             }
         }
 
-        stage('Get Cluster Info') {
+        stage('Get EC2 Public IP') {
             steps {
                 dir(env.TERRAFORM_DIR) {
-                    withCredentials([
-                        string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                        string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                        string(credentialsId: 'AWS_SESSION_TOKEN', variable: 'AWS_SESSION_TOKEN')
-                    ]) {
-                        sh '''
-                            echo "=== K3s Cluster Information ==="
-                            terraform output || echo "No outputs available yet"
-                            terraform show -json | jq -r '.values.root_module.resources[] | select(.type=="aws_instance") | .values.public_ip' || echo "No instance found in state"
-                        '''
+                    script {
+                        env.EC2_IP = sh(script: "terraform output -raw k3s_master_public_ip", returnStdout: true).trim()
+                        echo "EC2 Public IP: ${env.EC2_IP}"
                     }
                 }
             }
         }
 
+        stage('Run Spring Boot on EC2') {
+            steps {
+                sshagent([env.SSH_CREDENTIALS_ID]) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ubuntu@${env.EC2_IP} '
+                            docker pull ${DOCKER_IMAGE}
+                            docker stop my-app || true
+                            docker rm my-app || true
+                            docker run -d --name my-app -p 8082:8082 ${DOCKER_IMAGE}
+                        '
+                    """
+                }
+            }
+        }
 
+        stage('Verify Deployment') {
+            steps {
+                sh """
+                    echo "=== Checking App Endpoint ==="
+                    curl -f http://${env.EC2_IP}:8082/api/univeristes/getAll || echo "App endpoint not reachable yet"
+                """
+            }
+        }
+
+        stage('Terraform Destroy') {
+            steps {
+                dir(env.TERRAFORM_DIR) {
+                    sh 'terraform destroy -auto-approve'
+                }
+            }
+        }
     }
 
     post {
         always {
             dir(env.TERRAFORM_DIR) {
-                withCredentials([
-                    string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    string(credentialsId: 'AWS_SESSION_TOKEN', variable: 'AWS_SESSION_TOKEN')
-                ]) {
-                    sh '''
-                        echo "=== Final Terraform State Check ==="
-                        terraform state list || echo "No resources in state"
-                        terraform output 2>/dev/null || echo "No outputs available"
-                        echo "=== Created Resources ==="
-                        terraform show -no-color | grep -E "(aws_instance|public_ip|tags)" || echo "No resource details available"
-                    '''
-                }
+                sh 'terraform state list || echo "No resources in state"'
             }
         }
-        success {
-            echo "✅ Pipeline completed successfully!"
-        }
-        failure {
-            echo "❌ Pipeline failed - check the logs above for details"
-        }
+        success { echo "✅ Pipeline completed successfully!" }
+        failure { echo "❌ Pipeline failed - check logs above!" }
     }
 }
