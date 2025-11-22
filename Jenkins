@@ -13,14 +13,6 @@ pipeline {
             deleteDir()
         }
     }
-
-        stage('Checkout') {
-            steps {
-                git branch: 'feature/ReadMeInit',
-                    url: 'https://github.com/Brahim-Gdoura/GL5-G2-Foyer.git'
-            }
-        }
-
         stage('Maven Build') {
             steps {
                 sh '''
