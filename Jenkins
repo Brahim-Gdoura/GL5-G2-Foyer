@@ -8,6 +8,12 @@ pipeline {
     }
 
     stages {
+    stage('Cleanup') {
+        steps {
+            deleteDir()
+        }
+    }
+
         stage('Checkout') {
             steps {
                 git branch: 'feature/ReadMeInit',
